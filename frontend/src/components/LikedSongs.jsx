@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '../api/client';
 import '../styles/components/LikedSongs.css';
 
 function LikedSongs({ token, refreshSignal }) {
@@ -18,10 +18,15 @@ function LikedSongs({ token, refreshSignal }) {
     setError('');
 
     try {
-      const response = await axios.get('http://localhost:5000/api/music/liked', {
+      const response = await apiClient.get('/api/music/liked', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setLikedSongs(response.data);
+      const nextLikedSongs = Array.isArray(response.data?.data)
+        ? response.data.data
+        : Array.isArray(response.data)
+          ? response.data
+          : [];
+      setLikedSongs(nextLikedSongs);
     } catch (err) {
       setError('Could not load liked songs');
     } finally {

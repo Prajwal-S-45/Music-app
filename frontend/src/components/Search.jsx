@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '../api/client';
 import '../styles/components/Search.css';
 
 function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
@@ -20,10 +20,15 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
     if (!token) return;
 
     try {
-      const response = await axios.get('http://localhost:5000/api/music/liked', {
+      const response = await apiClient.get('/api/music/liked', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setLikedSongIds(response.data.map((song) => song.id));
+      const likedSongs = Array.isArray(response.data?.data)
+        ? response.data.data
+        : Array.isArray(response.data)
+          ? response.data
+          : [];
+      setLikedSongIds(likedSongs.map((song) => song.id));
     } catch (error) {
       console.error('Error fetching liked songs for search:', error);
     }
@@ -33,7 +38,7 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
     if (!token) return;
 
     try {
-      const response = await axios.get('http://localhost:5000/api/playlists', {
+      const response = await apiClient.get('/api/playlists', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setPlaylists(response.data);
@@ -51,10 +56,13 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
     }
 
     try {
-      const response = await axios.get(
-        `http://localhost:5000/api/music/search?query=${query}`
-      );
-      setResults(response.data);
+      const response = await apiClient.get(`/api/music/search?query=${query}`);
+      const nextResults = Array.isArray(response.data?.data)
+        ? response.data.data
+        : Array.isArray(response.data)
+          ? response.data
+          : [];
+      setResults(nextResults);
       setSearched(true);
       setStatus('');
     } catch (error) {
@@ -79,8 +87,8 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
     }
 
     try {
-      await axios.post(
-        'http://localhost:5000/api/music/like',
+      await apiClient.post(
+        '/api/music/like',
         { songId: song.id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -132,8 +140,8 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
     }
 
     try {
-      await axios.post(
-        'http://localhost:5000/api/playlists/add-song',
+      await apiClient.post(
+        '/api/playlists/add-song',
         { playlistId: selectedPlaylistId, songId: song.id },
         { headers: { Authorization: `Bearer ${token}` } }
       );

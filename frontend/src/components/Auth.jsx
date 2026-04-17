@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import apiClient from '../api/client';
 import '../styles/components/Auth.css';
 
 function Auth({ onLogin }) {
@@ -19,7 +19,7 @@ function Auth({ onLogin }) {
         ? { email, password }
         : { email, password, name };
 
-      const response = await axios.post(`http://localhost:5000${endpoint}`, data);
+      const response = await apiClient.post(endpoint, data);
       
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));

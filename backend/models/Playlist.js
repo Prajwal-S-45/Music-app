@@ -43,12 +43,40 @@ class Playlist {
     }
   }
 
+  static async removeSongFromPlaylist(playlistId, songId) {
+    const connection = await pool.getConnection();
+
+    try {
+      const result = await connection.execute(
+        'DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?',
+        [playlistId, songId]
+      );
+      return result[0];
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async findByIdAndUserId(playlistId, userId) {
+    const connection = await pool.getConnection();
+
+    try {
+      const [rows] = await connection.execute(
+        'SELECT * FROM playlists WHERE id = ? AND user_id = ?',
+        [playlistId, userId]
+      );
+      return rows[0];
+    } finally {
+      connection.release();
+    }
+  }
+
   static async getPlaylistSongs(playlistId) {
     const connection = await pool.getConnection();
     
     try {
       const [rows] = await connection.execute(
-        'SELECT s.* FROM songs s INNER JOIN playlist_songs ps ON s.id = ps.song_id WHERE ps.playlist_id = ?',
+        'SELECT song_id FROM playlist_songs WHERE playlist_id = ? ORDER BY added_at DESC',
         [playlistId]
       );
       return rows;

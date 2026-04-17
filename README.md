@@ -9,6 +9,7 @@ A full-stack music streaming application built with React, Node.js/Express, and 
 ✅ Music Player with Play/Pause Controls  
 ✅ Create & Manage Playlists  
 ✅ Like/Favorite Songs  
+✅ Real-time Shared Listening Rooms  
 ✅ User Profiles  
 
 ## 📋 Tech Stack
@@ -21,6 +22,7 @@ A full-stack music streaming application built with React, Node.js/Express, and 
 **Backend:**
 - Node.js + Express
 - MySQL Database
+- Socket.IO (real-time sync)
 - JWT Authentication
 - bcryptjs for password hashing
 

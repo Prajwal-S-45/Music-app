@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '../api/client';
 import '../styles/components/Playlists.css';
 
 function Playlists({ token }) {
@@ -19,7 +19,7 @@ function Playlists({ token }) {
 
   const fetchPlaylists = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/playlists', authHeaders);
+      const response = await apiClient.get('/api/playlists', authHeaders);
       setPlaylists(response.data);
     } catch (err) {
       setError('Could not load playlists');
@@ -37,11 +37,7 @@ function Playlists({ token }) {
     }
 
     try {
-      await axios.post(
-        'http://localhost:5000/api/playlists/create',
-        { name, description },
-        authHeaders
-      );
+      await apiClient.post('/api/playlists/create', { name, description }, authHeaders);
 
       setName('');
       setDescription('');

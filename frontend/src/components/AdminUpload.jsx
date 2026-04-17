@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import apiClient from '../api/client';
 import '../styles/components/AdminUpload.css';
 
 function AdminUpload({ token }) {
@@ -37,7 +37,7 @@ function AdminUpload({ token }) {
 
     try {
       setSubmitting(true);
-      await axios.post('http://localhost:5000/api/music/upload', formData, {
+      await apiClient.post('/api/music/upload', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

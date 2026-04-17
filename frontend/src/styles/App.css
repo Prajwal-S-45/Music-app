@@ -57,10 +57,12 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
+  isolation: isolate;
 }
 
 .nav-link {
   position: relative;
+  z-index: 1;
   width: 56px;
   height: 56px;
   border: none;
@@ -76,6 +78,7 @@ body {
 }
 
 .nav-link.active {
+  z-index: 2;
   transform: translateY(-30px);
   color: #e5fff6;
   background: radial-gradient(
@@ -156,6 +159,7 @@ body {
   left: 50%;
   transform: translateX(-50%);
   bottom: -22px;
+  pointer-events: none;
   padding: 3px 10px;
   border-radius: 999px;
   font-size: 11px;
@@ -171,6 +175,7 @@ body {
   bottom: -42px;
   left: 50%;
   transform: translateX(-50%);
+  pointer-events: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -229,17 +234,28 @@ body {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 22px 130px;
+  padding: 24px 30px 130px;
   display: flex;
   justify-content: center;
 }
 
 .content-wrapper {
   width: 100%;
-  max-width: 1180px;
+  max-width: 1500px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+@media (min-width: 1400px) {
+  .main-content {
+    padding-left: 42px;
+    padding-right: 42px;
+  }
+
+  .content-wrapper {
+    max-width: 1680px;
+  }
 }
 
 .hero-panel {
@@ -370,6 +386,10 @@ body {
 
   .main-content {
     padding: 58px 12px 120px;
+  }
+
+  .content-wrapper {
+    max-width: 100%;
   }
 
   .home-panel {

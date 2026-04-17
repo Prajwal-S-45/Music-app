@@ -181,6 +181,105 @@
   font-size: 13px;
 }
 
+.room-panel {
+  margin: 16px 20px 0;
+  border: 1px solid #dfe6fb;
+  border-radius: 16px;
+  background: #f9fbff;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.room-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-status-row p {
+  margin: 0;
+  font-size: 12px;
+  color: #556085;
+}
+
+.socket-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.socket-dot.online {
+  background: #1fa760;
+  box-shadow: 0 0 0 4px rgba(31, 167, 96, 0.15);
+}
+
+.socket-dot.offline {
+  background: #d34747;
+  box-shadow: 0 0 0 4px rgba(211, 71, 71, 0.12);
+}
+
+.room-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.room-controls input {
+  flex: 1;
+  border: 1px solid #cfd7f1;
+  border-radius: 12px;
+  padding: 9px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.room-controls input:focus {
+  border-color: #6c80e4;
+  box-shadow: 0 0 0 3px rgba(108, 128, 228, 0.16);
+}
+
+.room-controls button {
+  border: none;
+  border-radius: 999px;
+  background: #667eea;
+  color: #fff;
+  padding: 8px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.room-controls .leave-room {
+  background: #ca4e66;
+}
+
+.room-controls .create-room {
+  background: #1f9d75;
+}
+
+.room-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.room-meta p {
+  margin: 0;
+  font-size: 12px;
+  color: #4c567a;
+}
+
+.room-meta .copy-room {
+  justify-self: start;
+  border: none;
+  border-radius: 999px;
+  background: #3f5bcc;
+  color: #fff;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
 .queue-panel {
   margin: 16px 20px 8px;
   border: 1px solid #e5e9f5;

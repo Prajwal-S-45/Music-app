@@ -19,9 +19,10 @@ class Music {
     const connection = await pool.getConnection();
     
     try {
-      const [rows] = await connection.execute(
-        'SELECT * FROM songs LIMIT ? OFFSET ?',
-        [limit, offset]
+      const safeLimit = Number.isInteger(Number(limit)) ? Math.max(1, Math.min(200, Number(limit))) : 50;
+      const safeOffset = Number.isInteger(Number(offset)) ? Math.max(0, Number(offset)) : 0;
+      const [rows] = await connection.query(
+        `SELECT * FROM songs LIMIT ${safeLimit} OFFSET ${safeOffset}`
       );
       return rows;
     } finally {
