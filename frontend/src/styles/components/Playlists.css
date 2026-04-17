@@ -1,0 +1,103 @@
+.playlists-panel {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 18px 40px rgba(21, 30, 66, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.playlists-header h3 {
+  margin: 0;
+  color: #1f2a44;
+  font-size: 22px;
+}
+
+.playlists-header p {
+  margin: 8px 0 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+.playlist-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.playlist-form input,
+.playlist-form textarea {
+  width: 100%;
+  border: 1px solid #d7ddea;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  background: #fbfcff;
+  color: #1f2a44;
+}
+
+.playlist-form input:focus,
+.playlist-form textarea:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.14);
+}
+
+.playlist-form button {
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #667eea, #7c5cff);
+  color: #fff;
+  padding: 12px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.playlist-message {
+  margin-top: 12px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.playlist-message.error {
+  background: #fde8e8;
+  color: #a23b3b;
+}
+
+.playlist-message.success {
+  background: #e8f7ee;
+  color: #27734d;
+}
+
+.playlist-list {
+  margin-top: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.playlist-card {
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f9fbff, #eef2ff);
+  border: 1px solid #e5e9f5;
+}
+
+.playlist-card h4 {
+  margin: 0 0 6px;
+  color: #1f2a44;
+}
+
+.playlist-card p,
+.empty-state p {
+  margin: 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+.empty-state {
+  padding: 18px 14px;
+  border-radius: 18px;
+  border: 1px dashed #c9d2eb;
+  background: #fcfdff;
+}
