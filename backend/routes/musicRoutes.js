@@ -88,8 +88,17 @@ router.get('/trending', musicController.getTrending);
 // Search songs
 router.get('/search', musicController.searchSongs);
 
+// Search songs from Audius API (explicit search namespace)
+router.get('/search/audius', musicController.searchAudiusSongs);
+
+// Unified search across Audius, Jamendo, and MusicBrainz
+router.get('/search/all', musicController.searchAllSources);
+
 // Search songs from Audius API
 router.get('/audius/search', musicController.searchAudiusSongs);
+
+// Search songs metadata from MusicBrainz API
+router.get('/musicbrainz/search', musicController.searchMusicbrainzSongs);
 
 // Get song by ID
 router.get('/songs/:id', musicController.getSongById);
