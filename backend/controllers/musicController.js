@@ -1,11 +1,31 @@
 const jamendoService = require('../services/jamendoService');
 const audiusService = require('../services/audiusService');
+const musicbrainzService = require('../services/musicbrainzService');
 const pool = require('../config/database');
 
 const getRequestBaseUrl = (req) => {
   const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
   const protocol = forwardedProto || req.protocol || 'http';
   return `${protocol}://${req.get('host')}`;
+};
+
+const normalizeUnifiedSong = (song) => {
+  const cover = song.cover || song.image || null;
+  const streamUrl = song.streamUrl || song.file_url || null;
+
+  return {
+    id: song.id,
+    title: song.title || 'Unknown Title',
+    artist: song.artist || 'Unknown Artist',
+    album: song.album || null,
+    duration: Number(song.duration) || 0,
+    cover,
+    streamUrl,
+    source: song.source || 'unknown',
+    playable: Boolean(streamUrl),
+    score: Number(song.score) || 0,
+    release_date: song.release_date || null,
+  };
 };
 
 /**
@@ -120,6 +140,117 @@ exports.searchAudiusSongs = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in searchAudiusSongs:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Search tracks metadata from MusicBrainz
+ * @route GET /api/music/musicbrainz/search
+ * @query {string} query - Search keyword (required)
+ * @query {number} limit - Results per page (default: 25)
+ */
+exports.searchMusicbrainzSongs = async (req, res) => {
+  try {
+    const { query } = req.query;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 25, 100);
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const songs = await musicbrainzService.searchRecordings(query, limit);
+
+    res.json({
+      success: true,
+      source: 'musicbrainz',
+      query: query.trim(),
+      total: songs.length,
+      data: songs,
+    });
+  } catch (error) {
+    console.error('Error in searchMusicbrainzSongs:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Unified search across Jamendo, Audius, and MusicBrainz
+ * @route GET /api/music/search/all
+ * @query {string} query - Search keyword (required)
+ * @query {number} limit - Total result cap per source (default: 12)
+ */
+exports.searchAllSources = async (req, res) => {
+  try {
+    const { query } = req.query;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 12, 30);
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const artworkBaseUrl = getRequestBaseUrl(req);
+
+    const [jamendoResult, audiusResult, musicbrainzResult] = await Promise.allSettled([
+      jamendoService.searchSongs(query, limit),
+      audiusService.searchTracks(query, limit, artworkBaseUrl),
+      musicbrainzService.searchRecordings(query, limit),
+    ]);
+
+    const jamendoSongs = jamendoResult.status === 'fulfilled' ? jamendoResult.value : [];
+    const audiusSongs = audiusResult.status === 'fulfilled' ? audiusResult.value : [];
+    const musicbrainzSongs = musicbrainzResult.status === 'fulfilled' ? musicbrainzResult.value : [];
+
+    const merged = [
+      ...audiusSongs.map(normalizeUnifiedSong),
+      ...jamendoSongs.map(normalizeUnifiedSong),
+      ...musicbrainzSongs.map(normalizeUnifiedSong),
+    ];
+
+    const seen = new Set();
+    const deduped = [];
+
+    for (const item of merged) {
+      const key = `${String(item.title).toLowerCase()}::${String(item.artist).toLowerCase()}::${item.source}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      deduped.push(item);
+    }
+
+    deduped.sort((a, b) => {
+      if (a.playable !== b.playable) {
+        return a.playable ? -1 : 1;
+      }
+
+      if (a.source !== b.source) {
+        const sourceOrder = { audius: 1, jamendo: 2, musicbrainz: 3 };
+        return (sourceOrder[a.source] || 99) - (sourceOrder[b.source] || 99);
+      }
+
+      return (b.score || 0) - (a.score || 0);
+    });
+
+    res.json({
+      success: true,
+      source: 'unified',
+      query: query.trim(),
+      total: deduped.length,
+      bySource: {
+        audius: audiusSongs.length,
+        jamendo: jamendoSongs.length,
+        musicbrainz: musicbrainzSongs.length,
+      },
+      data: deduped,
+      warnings: {
+        audius: audiusResult.status === 'rejected' ? audiusResult.reason?.message || 'Audius unavailable' : null,
+        jamendo: jamendoResult.status === 'rejected' ? jamendoResult.reason?.message || 'Jamendo unavailable' : null,
+        musicbrainz: musicbrainzResult.status === 'rejected' ? musicbrainzResult.reason?.message || 'MusicBrainz unavailable' : null,
+      },
+    });
+  } catch (error) {
+    console.error('Error in searchAllSources:', error);
     res.status(500).json({ error: error.message });
   }
 };
