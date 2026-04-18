@@ -1,28 +1,53 @@
-import React, { useEffect, useState } from 'react';
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Player from './Player';
 import Search from './Search';
 import Playlists from './Playlists';
 import LikedSongs from './LikedSongs';
 import AdminUpload from './AdminUpload';
-import HomeSongs from './HomeSongs';
 import SyncedMusicPlayer from './SyncedMusicPlayer';
 import ExternalStreamPlayer from './ExternalStreamPlayer';
-import '../styles/App.css';
+import DashboardHome from './DashboardHome';
+import Sidebar from './Sidebar';
+import Header from './Header';
+import Queue from './Queue';
+import PlayerBar from './PlayerBar';
+import '../styles/components/DashboardLayout.css';
 
 function AppShell({ user, token, onLogout }) {
   const [likedRefresh, setLikedRefresh] = useState(0);
   const [activeTrack, setActiveTrack] = useState(null);
-  const [queuedTrack, setQueuedTrack] = useState(null);
+  const [homeTracks, setHomeTracks] = useState([]);
+  const [language, setLanguage] = useState('EN');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [isCompactLayout, setIsCompactLayout] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const syncLayoutFlags = () => {
+      const compact = window.innerWidth <= 1100;
+      setIsCompactLayout(compact);
+      setIsSidebarOpen(!compact);
+      if (compact) {
+        setIsQueueOpen(false);
+      } else {
+        setIsQueueOpen(true);
+      }
+    };
+
+    syncLayoutFlags();
+    window.addEventListener('resize', syncLayoutFlags);
+    return () => window.removeEventListener('resize', syncLayoutFlags);
+  }, []);
 
   useEffect(() => {
     navigate('/', { replace: true });
   }, [user?.id]);
 
   useEffect(() => {
-    const content = document.querySelector('.main-content');
+    const content = document.querySelector('.dashboard-scroll');
     if (content) {
       content.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     }
@@ -33,93 +58,65 @@ function AppShell({ user, token, onLogout }) {
   };
 
   const handlePlayTrack = (song) => {
+    setActiveTrack({ ...song, requestId: Date.now() });
     navigate('/songs');
+  };
+
+  const handleHomeTrackSelect = (song) => {
     setActiveTrack({ ...song, requestId: Date.now() });
   };
 
-  const handleQueueTrack = (song) => {
-    setQueuedTrack({ ...song, queueId: Date.now() });
-  };
-
-  const navItems = [
-    { key: 'home', label: 'Home', icon: 'home', path: '/' },
-    { key: 'songs', label: 'Songs', icon: 'music', path: '/songs' },
-    { key: 'stream', label: 'Stream', icon: 'stream', path: '/stream' },
-    { key: 'sync', label: 'Sync', icon: 'sync', path: '/sync' },
-    { key: 'search', label: 'Search', icon: 'search', path: '/search' },
-    { key: 'library', label: 'Library', icon: 'library', path: '/library' },
-    { key: 'setting', label: 'Setting', icon: 'setting', path: '/settings' },
-    { key: 'account', label: 'Profile', icon: 'account', path: '/profile' },
-  ];
-
-  const iconUrlMap = {
-    home: 'https://img.icons8.com/ios/48/home--v1.png',
-    music: 'https://img.icons8.com/ios/48/musical-notes.png',
-    stream: 'https://img.icons8.com/ios/48/radio-tower.png',
-    sync: 'https://img.icons8.com/ios/48/synchronize.png',
-    search: 'https://img.icons8.com/ios/48/search--v1.png',
-    library: 'https://img.icons8.com/?size=48&id=3161&format=png',
-    setting: 'https://img.icons8.com/ios/48/settings--v1.png',
-    account: 'https://img.icons8.com/ios/48/user--v1.png',
-  };
-
-  const renderNavIcon = (icon) => {
-    if (iconUrlMap[icon]) {
-      return (
-        <img
-          src={iconUrlMap[icon]}
-          alt=""
-          className="nav-icon-image"
-          loading="lazy"
-          decoding="async"
-        />
-      );
+  const handleSearchSubmit = (searchValue) => {
+    if (!searchValue) {
+      navigate('/search');
+      return;
     }
 
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M14 4v9.2a2.8 2.8 0 1 1-1.8-2.6V6.2l7-1.7v7.7a2.8 2.8 0 1 1-1.8-2.6V3.2L14 4z" />
-      </svg>
-    );
+    navigate(`/search?q=${encodeURIComponent(searchValue)}`);
   };
 
+  const queueItems = useMemo(() => homeTracks.slice(0, 8), [homeTracks]);
+
   return (
-    <div className="app-container">
-      <div className="app-shell">
-        <aside className="sidebar">
-          <div className="nav-links">
-            {navItems.map((item) => {
-              const normalizedPath = String(item.path || '/').trim();
+    <div className={`dashboard-shell ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'} ${isQueueOpen ? 'queue-open' : ''}`}>
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onCreatePlaylist={() => navigate('/library')}
+      />
 
-              return (
-              <NavLink
-                key={item.key}
-                to={normalizedPath}
-                aria-label={item.label}
-                end={normalizedPath === '/'}
-                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-              >
-                {({ isActive }) => (
-                  <>
-                    <span className="nav-icon">{renderNavIcon(item.icon)}</span>
-                    {isActive && <span className="nav-tooltip">{item.label}</span>}
-                  </>
-                )}
-              </NavLink>
-              );
-            })}
-          </div>
-        </aside>
+      {isCompactLayout && isSidebarOpen && (
+        <button
+          type="button"
+          className="dashboard-overlay"
+          aria-label="Close sidebar"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
-        <div className="sidebar-user">
-          <span>Welcome, {user.name}</span>
-          <button type="button" onClick={onLogout}>Logout</button>
-        </div>
+      <div className="dashboard-main-shell">
+        <Header
+          userName={user?.name || 'Listener'}
+          onSearchSubmit={handleSearchSubmit}
+          language={language}
+          onLanguageChange={setLanguage}
+          onLogout={onLogout}
+          onToggleSidebar={() => setIsSidebarOpen((value) => !value)}
+        />
 
-        <main className="main-content">
-          <div className="content-wrapper">
+        <main className="dashboard-content">
+          <div className="dashboard-scroll">
             <Routes>
-              <Route path="/" element={<HomeSongs user={user} />} />
+              <Route
+                path="/"
+                element={
+                  <DashboardHome
+                    user={user}
+                    onTrackSelect={handleHomeTrackSelect}
+                    onTracksLoaded={setHomeTracks}
+                  />
+                }
+              />
               <Route
                 path="/songs"
                 element={
@@ -127,7 +124,7 @@ function AppShell({ user, token, onLogout }) {
                     token={token}
                     user={user}
                     activeTrack={activeTrack}
-                    queuedTrack={queuedTrack}
+                    queuedTrack={queueItems[0] || null}
                     onLikeUpdate={handleLikeUpdate}
                   />
                 }
@@ -135,27 +132,17 @@ function AppShell({ user, token, onLogout }) {
               <Route
                 path="/sync"
                 element={
-                  <SyncedMusicPlayer
-                    roomId="chill-zone"
-                    userName={user?.name || 'Listener'}
-                  />
+                  <SyncedMusicPlayer roomId="chill-zone" userName={user?.name || 'Listener'} />
                 }
               />
-              <Route
-                path="/stream"
-                element={
-                  <ExternalStreamPlayer
-                    apiEndpoint="/api/music/trending?limit=10"
-                  />
-                }
-              />
+              <Route path="/stream" element={<ExternalStreamPlayer apiEndpoint="/api/music/trending?limit=10" />} />
               <Route
                 path="/search"
                 element={
                   <Search
                     token={token}
                     onPlayTrack={handlePlayTrack}
-                    onQueueTrack={handleQueueTrack}
+                    onQueueTrack={handleHomeTrackSelect}
                     onLikeUpdate={handleLikeUpdate}
                   />
                 }
@@ -168,6 +155,22 @@ function AppShell({ user, token, onLogout }) {
           </div>
         </main>
       </div>
+
+      <Queue
+        isOpen={isQueueOpen}
+        isCompactLayout={isCompactLayout}
+        onToggleQueue={() => setIsQueueOpen((value) => !value)}
+        items={queueItems}
+        activeTrackId={activeTrack?.id}
+        onSelectTrack={handleHomeTrackSelect}
+      />
+
+      <PlayerBar
+        track={activeTrack || queueItems[0] || null}
+        queue={queueItems}
+        onSelectTrack={handleHomeTrackSelect}
+        onToggleQueue={() => setIsQueueOpen((value) => !value)}
+      />
     </div>
   );
 }
