@@ -76,9 +76,12 @@ App runs at: `http://localhost:3000`
 - `GET /api/users/profile` - Get user profile (requires auth)
 
 ### Music
-- `GET /api/music/songs` - Get all songs
-- `GET /api/music/search?query=term` - Search songs
-- `GET /api/music/songs/:id` - Get song details
+- `GET /api/music/search?query=term` - Search YouTube songs (music namespace)
+- `GET /api/music/trending` - Trending YouTube songs (music namespace)
+- `GET /api/search?q=term` - Search YouTube songs (primary endpoint)
+- `GET /api/trending` - Fetch trending YouTube music videos (India-focused)
+- `GET /api/music/search/all?query=term` - Backward-compatible alias to YouTube search
+- `GET /api/music/artwork?url=<encoded-image-url>` - Safe artwork proxy/fallback
 - `POST /api/music/like` - Like a song (requires auth)
 - `GET /api/music/liked` - Get liked songs (requires auth)
 
@@ -126,6 +129,12 @@ Music-app/
 3. **Start Frontend** - Run `npm run dev` in frontend folder
 4. **Access App** - Open http://localhost:3000
 
+## 🌐 API Keys / Env
+
+Set these in `backend/.env` before running backend:
+
+- `YOUTUBE_API_KEY` - YouTube Data API v3 key
+
 ## 🎯 Next Steps
 
 - [ ] Add offline mode support
@@ -147,7 +156,7 @@ Music-app/
 
 1. Change JWT_SECRET in `.env` for production
 2. Use environment variables for sensitive data
-3. Songs need `file_url` pointing to audio files
+3. Song playback uses YouTube `videoId` data
 4. Test with sample songs in the database
 
 ---
