@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
 import {
   Album,
@@ -11,7 +12,6 @@ import {
   Music2,
   PlusCircle,
   Radio,
-  Search,
   Sparkles,
   TrendingUp,
   UsersRound,
@@ -31,12 +31,11 @@ const libraryItems = [
   { label: 'Liked Songs', icon: Heart, to: '/profile' },
   { label: 'Albums', icon: Album },
   { label: 'Podcasts', icon: Mic2 },
-  { label: 'Artists', icon: Music2 },
+  { label: 'Artists', icon: Music2, to: '/library?section=artists' },
 ];
 
 const primaryItems = [
   { label: 'Home', icon: Home, to: '/' },
-  { label: 'Search', icon: Search, to: '/search' },
   { label: 'Your Library', icon: LibraryBig, to: '/library' },
 ];
 
@@ -50,40 +49,59 @@ function Sidebar({ onCreatePlaylist, isOpen, onClose }) {
   };
 
   return (
-    <aside className={`dashboard-sidebar ${isOpen ? 'open' : ''}`}>
-      <div className="dashboard-brand">
+    <motion.aside
+      initial={{ opacity: 0, x: -16 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.28, ease: 'easeOut' }}
+      className={`dashboard-sidebar dashboard-sidebar--slim ${isOpen ? 'open' : ''}`}
+    >
+      <div className="dashboard-sidebar__brand">
         <div className="dashboard-brand__mark">M</div>
-        <div>
+        <div className="dashboard-sidebar__brand-copy">
           <strong>Music App</strong>
           <span>Premium streaming</span>
         </div>
       </div>
 
-      <nav className="dashboard-nav" aria-label="Primary navigation">
+      <nav className="dashboard-sidebar__nav" aria-label="Primary navigation">
         {primaryItems.map((item) => (
-          <NavLink
+          <motion.div
             key={item.label}
-            to={item.to}
-            end={item.to === '/'}
-            className={({ isActive }) => `dashboard-nav__item ${isActive ? 'active' : ''}`}
-            onClick={handleCloseIfCompact}
+            whileHover={{ x: 2 }}
+            whileTap={{ scale: 0.99 }}
           >
-            <MenuIcon icon={item.icon} />
-            <span>{item.label}</span>
-          </NavLink>
+            <NavLink
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) => `dashboard-sidebar__nav-item ${isActive ? 'active' : ''}`}
+              onClick={handleCloseIfCompact}
+            >
+              <span className="dashboard-sidebar__nav-icon">
+                <MenuIcon icon={item.icon} />
+              </span>
+              <span className="dashboard-sidebar__nav-label">{item.label}</span>
+            </NavLink>
+          </motion.div>
         ))}
       </nav>
 
       <div className="dashboard-sidebar__section">
         <p className="dashboard-sidebar__label">Browse</p>
-        <div className="dashboard-chip-grid">
+        <div className="dashboard-sidebar__quick-grid">
           {browseItems.map((item) => {
             const Icon = item.icon;
             return (
-              <button key={item.label} type="button" className="dashboard-chip" title={item.label}>
-                <Icon size={16} strokeWidth={2} />
+              <motion.button
+                key={item.label}
+                type="button"
+                className="dashboard-sidebar__quick-item"
+                title={item.label}
+                whileHover={{ y: -1, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Icon size={15} strokeWidth={2} />
                 <span>{item.label}</span>
-              </button>
+              </motion.button>
             );
           })}
         </div>
@@ -91,22 +109,22 @@ function Sidebar({ onCreatePlaylist, isOpen, onClose }) {
 
       <div className="dashboard-sidebar__section">
         <p className="dashboard-sidebar__label">My Library</p>
-        <div className="dashboard-library-list">
+        <div className="dashboard-sidebar__library-list">
           {libraryItems.map((item) => {
             const Icon = item.icon;
             return item.to ? (
               <NavLink
                 key={item.label}
                 to={item.to}
-                className={({ isActive }) => `dashboard-library-list__item ${isActive ? 'active' : ''}`}
+                className={({ isActive }) => `dashboard-sidebar__library-item ${isActive ? 'active' : ''}`}
                 onClick={handleCloseIfCompact}
               >
-                <Icon size={16} strokeWidth={2} />
+                <span className="dashboard-sidebar__library-icon"><Icon size={15} strokeWidth={2} /></span>
                 <span>{item.label}</span>
               </NavLink>
             ) : (
-              <button key={item.label} type="button" className="dashboard-library-list__item">
-                <Icon size={16} strokeWidth={2} />
+              <button key={item.label} type="button" className="dashboard-sidebar__library-item">
+                <span className="dashboard-sidebar__library-icon"><Icon size={15} strokeWidth={2} /></span>
                 <span>{item.label}</span>
               </button>
             );
@@ -114,11 +132,11 @@ function Sidebar({ onCreatePlaylist, isOpen, onClose }) {
         </div>
       </div>
 
-      <button type="button" className="dashboard-create-playlist" onClick={onCreatePlaylist}>
-        <PlusCircle size={18} strokeWidth={2} />
-        <span>Create Playlist</span>
+      <button type="button" className="dashboard-sidebar__create-playlist" onClick={onCreatePlaylist}>
+        <PlusCircle size={16} strokeWidth={2} />
+        <span>Create playlist</span>
       </button>
-    </aside>
+    </motion.aside>
   );
 }
 

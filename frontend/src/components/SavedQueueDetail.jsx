@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Edit3, Play, PlayCircle, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { deleteSavedQueue, getSavedQueueById, renameSavedQueue } from '../utils/savedQueues';
-import '../styles/components/Playlists.css';
+import '../styles/Playlists.css';
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1000&q=80';

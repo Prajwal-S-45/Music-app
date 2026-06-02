@@ -75,39 +75,16 @@ router.get('/artwork', async (req, res) => {
 	}
 });
 
-/**
- * Public routes - Jamendo API endpoints
- */
-
-// Get all songs / Trending
-router.get('/songs', musicController.getAllSongs);
-
-// Get trending songs (explicit route)
+// Public routes
 router.get('/trending', musicController.getTrending);
+router.get('/songs', musicController.getSongs);
+router.get('/artists', musicController.getArtists);
+router.get('/cache/stats', musicController.getCacheStats);
 
-// Search songs
 router.get('/search', musicController.searchSongs);
 
-// Search songs from Audius API (explicit search namespace)
-router.get('/search/audius', musicController.searchAudiusSongs);
-
-// Unified search across Audius, Jamendo, and MusicBrainz
-router.get('/search/all', musicController.searchAllSources);
-
-// Search songs from Audius API
-router.get('/audius/search', musicController.searchAudiusSongs);
-
-// Search songs metadata from MusicBrainz API
-router.get('/musicbrainz/search', musicController.searchMusicbrainzSongs);
-
-// Get song by ID
-router.get('/songs/:id', musicController.getSongById);
-
-// Get songs by artist
-router.get('/artist/:artistId', musicController.getSongsByArtist);
-
-// Get songs by album
-router.get('/album/:albumId', musicController.getSongsByAlbum);
+// Compatibility route for existing frontend code that still calls /search/all.
+router.get('/search/all', musicController.searchSongs);
 
 /**
  * Protected routes - User likes/favorites

@@ -53,7 +53,7 @@ const ensureLikedSongsTimestampColumn = async (connection) => {
   }
 };
 
-const ensureJamendoCompatibleSchema = async () => {
+const ensureExternalMusicSchema = async () => {
   const connection = await pool.getConnection();
 
   try {
@@ -66,5 +66,5 @@ const ensureJamendoCompatibleSchema = async () => {
 };
 
 module.exports = {
-  ensureJamendoCompatibleSchema,
+  ensureExternalMusicSchema,
 };

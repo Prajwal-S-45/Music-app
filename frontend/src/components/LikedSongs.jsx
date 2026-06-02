@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import apiClient from '../api/client';
-import '../styles/components/LikedSongs.css';
+import '../styles/LikedSongs.css';
 
 function LikedSongs({ token, refreshSignal }) {
   const [likedSongs, setLikedSongs] = useState([]);

@@ -17,7 +17,7 @@ function AppRoutes(props) {
       <Route path="/search" element={<SearchPage token={token} onPlayTrack={onPlayTrack} onQueueTrack={onQueueTrack} onLikeUpdate={onLikeUpdate} />} />
       <Route path="/library" element={<LibraryPage token={token} />} />
       <Route path="/profile" element={<ProfilePage token={token} refreshSignal={likedRefresh} />} />
-      <Route path="/settings" element={<SettingsPage token={token} />} />
+      <Route path="/settings" element={<SettingsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

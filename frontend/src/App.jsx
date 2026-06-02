@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AppShell from './components/AppShell';
 import LoginPage from './pages/LoginPage';
+import HomePage from './pages/HomePage';
 import RegisterPage from './pages/RegisterPage';
 
 function App() {
@@ -40,8 +41,8 @@ function App() {
         <Route path="/login" element={<LoginPage user={user} token={token} onLogin={handleLogin} />} />
         <Route path="/register" element={<RegisterPage user={user} token={token} onLogin={handleLogin} />} />
         <Route
-          path="/*"
-          element={user && token ? <AppShell user={user} token={token} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+          path="*"
+          element={user && token ? <AppShell user={user} token={token} onLogout={handleLogout} /> : <HomePage />}
         />
       </Routes>
     </BrowserRouter>

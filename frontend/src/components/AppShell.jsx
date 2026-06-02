@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Player from './Player';
 import Search from './Search';
 import Playlists from './Playlists';
+import SavedQueueDetail from './SavedQueueDetail';
 import LikedSongs from './LikedSongs';
-import AdminUpload from './AdminUpload';
 import SyncedMusicPlayer from './SyncedMusicPlayer';
 import ExternalStreamPlayer from './ExternalStreamPlayer';
 import DashboardHome from './DashboardHome';
@@ -12,12 +12,16 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import Queue from './Queue';
 import PlayerBar from './PlayerBar';
-import '../styles/components/DashboardLayout.css';
+import ArtistDetailPage from './ArtistDetailPage';
+import '../styles/DashboardLayout.css';
+import '../styles/MobileOptimization.css';
 
 function AppShell({ user, token, onLogout }) {
   const [likedRefresh, setLikedRefresh] = useState(0);
   const [activeTrack, setActiveTrack] = useState(null);
   const [homeTracks, setHomeTracks] = useState([]);
+  const [queueTracks, setQueueTracks] = useState([]);
+  const [queueWasCleared, setQueueWasCleared] = useState(false);
   const [language, setLanguage] = useState('EN');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
@@ -53,17 +57,70 @@ function AppShell({ user, token, onLogout }) {
     }
   }, [location.pathname]);
 
-  const handleLikeUpdate = () => {
+  const handleLikeUpdate = useCallback(() => {
     setLikedRefresh((value) => value + 1);
-  };
+  }, []);
 
-  const handlePlayTrack = (song) => {
+  const handleTracksLoaded = useCallback((tracks) => {
+    setHomeTracks(tracks);
+    setQueueTracks((currentQueue) => {
+      if (currentQueue.length === 0 && !queueWasCleared) {
+        return tracks.slice(0, 8);
+      }
+
+      return currentQueue;
+    });
+  }, [queueWasCleared]);
+
+  const handlePlayTrack = useCallback((song) => {
     setActiveTrack({ ...song, requestId: Date.now() });
     navigate('/songs');
+  }, [navigate]);
+
+  const handleHomeTrackSelect = useCallback((song) => {
+    setActiveTrack({ ...song, requestId: Date.now() });
+  }, []);
+
+  const handleQueuePlayTrack = (song) => {
+    setActiveTrack({ ...song, requestId: Date.now(), shouldAutoPlay: true });
   };
 
-  const handleHomeTrackSelect = (song) => {
-    setActiveTrack({ ...song, requestId: Date.now() });
+  const handleReorderQueue = (fromIndex, toIndex) => {
+    setQueueTracks((currentQueue) => {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= currentQueue.length ||
+        toIndex >= currentQueue.length
+      ) {
+        return currentQueue;
+      }
+
+      const nextQueue = currentQueue.slice();
+      const [movedItem] = nextQueue.splice(fromIndex, 1);
+      nextQueue.splice(toIndex, 0, movedItem);
+      return nextQueue;
+    });
+  };
+
+  const handleRemoveQueueItem = (queueItemId) => {
+    setQueueTracks((currentQueue) => currentQueue.filter((item) => item.id !== queueItemId));
+  };
+
+  const handleRemoveQueueItems = (queueItemIds) => {
+    const removalSet = new Set(queueItemIds);
+    setQueueTracks((currentQueue) => currentQueue.filter((item) => !removalSet.has(item.id)));
+  };
+
+  const handleClearQueue = () => {
+    setQueueTracks([]);
+    setQueueWasCleared(true);
+  };
+
+  const handleRestoreQueue = (restoredQueue) => {
+    setQueueTracks(restoredQueue);
+    setQueueWasCleared(false);
   };
 
   const handleSearchSubmit = (searchValue) => {
@@ -75,10 +132,28 @@ function AppShell({ user, token, onLogout }) {
     navigate(`/search?q=${encodeURIComponent(searchValue)}`);
   };
 
-  const queueItems = useMemo(() => homeTracks.slice(0, 8), [homeTracks]);
+  const handlePlaySavedQueueSong = (song, queueSongs) => {
+    if (!song || !Array.isArray(queueSongs) || queueSongs.length === 0) {
+      return;
+    }
+
+    setQueueTracks(queueSongs);
+    setQueueWasCleared(false);
+    setActiveTrack({ ...song, requestId: Date.now(), shouldAutoPlay: true });
+  };
+
+  const handlePlaySavedQueueAll = (queueSongs) => {
+    if (!Array.isArray(queueSongs) || queueSongs.length === 0) {
+      return;
+    }
+
+    setQueueTracks(queueSongs);
+    setQueueWasCleared(false);
+    setActiveTrack({ ...queueSongs[0], requestId: Date.now(), shouldAutoPlay: true });
+  };
 
   return (
-    <div className={`dashboard-shell ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'} ${isQueueOpen ? 'queue-open' : ''}`}>
+    <div className={`dashboard-shell ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'} ${isQueueOpen ? 'queue-open' : ''} ${isCompactLayout ? 'compact' : ''}`}>
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -113,7 +188,7 @@ function AppShell({ user, token, onLogout }) {
                   <DashboardHome
                     user={user}
                     onTrackSelect={handleHomeTrackSelect}
-                    onTracksLoaded={setHomeTracks}
+                    onTracksLoaded={handleTracksLoaded}
                   />
                 }
               />
@@ -124,7 +199,7 @@ function AppShell({ user, token, onLogout }) {
                     token={token}
                     user={user}
                     activeTrack={activeTrack}
-                    queuedTrack={queueItems[0] || null}
+                    queuedTrack={queueTracks[0] || null}
                     onLikeUpdate={handleLikeUpdate}
                   />
                 }
@@ -135,6 +210,8 @@ function AppShell({ user, token, onLogout }) {
                   <SyncedMusicPlayer roomId="chill-zone" userName={user?.name || 'Listener'} />
                 }
               />
+              <Route path="/artists" element={<Navigate to="/library?section=artists" replace />} />
+              <Route path="/artist/:name" element={<ArtistDetailPage onPlayTrack={handleHomeTrackSelect} />} />
               <Route path="/stream" element={<ExternalStreamPlayer apiEndpoint="/api/music/trending?limit=10" />} />
               <Route
                 path="/search"
@@ -147,9 +224,25 @@ function AppShell({ user, token, onLogout }) {
                   />
                 }
               />
-              <Route path="/library" element={<Playlists token={token} />} />
+              <Route
+                path="/library"
+                element={
+                  <Playlists
+                    onPlayAll={handlePlaySavedQueueAll}
+                  />
+                }
+              />
+              <Route
+                path="/library/saved/:queueId"
+                element={
+                  <SavedQueueDetail
+                    onPlaySong={handlePlaySavedQueueSong}
+                    onPlayAll={handlePlaySavedQueueAll}
+                  />
+                }
+              />
               <Route path="/profile" element={<LikedSongs token={token} refreshSignal={likedRefresh} />} />
-              <Route path="/settings" element={<AdminUpload token={token} />} />
+              <Route path="/settings" element={<div className="dashboard-settings-page"><h2>Settings</h2><p>Upload support has been removed from this app.</p></div>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
@@ -160,14 +253,22 @@ function AppShell({ user, token, onLogout }) {
         isOpen={isQueueOpen}
         isCompactLayout={isCompactLayout}
         onToggleQueue={() => setIsQueueOpen((value) => !value)}
-        items={queueItems}
+        items={queueTracks}
         activeTrackId={activeTrack?.id}
         onSelectTrack={handleHomeTrackSelect}
+        onPlayTrack={handleQueuePlayTrack}
+        onClearQueue={handleClearQueue}
+        onRestoreQueue={handleRestoreQueue}
+        onReorderQueue={handleReorderQueue}
+        onRemoveQueueItem={handleRemoveQueueItem}
+        onRemoveQueueItems={handleRemoveQueueItems}
       />
 
       <PlayerBar
-        track={activeTrack || queueItems[0] || null}
-        queue={queueItems}
+        track={activeTrack || queueTracks[0] || null}
+        queue={queueTracks}
+        isQueueOpen={isQueueOpen}
+        isCompactLayout={isCompactLayout}
         onSelectTrack={handleHomeTrackSelect}
         onToggleQueue={() => setIsQueueOpen((value) => !value)}
       />

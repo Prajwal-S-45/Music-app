@@ -1,26 +1,30 @@
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 const userRoutes = require('./routes/userRoutes');
 const musicRoutes = require('./routes/musicRoutes');
+const youtubeRoutes = require('./routes/youtubeRoutes');
 const playlistRoutes = require('./routes/playlistRoutes');
 const roomRoutes = require('./routes/roomRoutes');
 const roomStore = require('./services/roomStore');
-const { ensureJamendoCompatibleSchema } = require('./services/schemaMigrations');
+const { ensureExternalMusicSchema } = require('./services/schemaMigrations');
 
 const app = express();
 const server = http.createServer(app);
-const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173,http://localhost:3000')
+const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173,http://localhost:3000,http://localhost:3001')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
 const isAllowedOrigin = (origin) => {
   if (!origin) {
+    return true;
+  }
+
+  // In development allow any localhost origin (different dev ports)
+  if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
     return true;
   }
 
@@ -42,21 +46,19 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-app.use('/uploads', express.static(uploadsDir));
-
 // Routes
 app.use('/api/users', userRoutes);
+app.use('/api', youtubeRoutes);
 app.use('/api/music', musicRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/rooms', roomRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running' });
+  res.json({
+    status: 'Server is running',
+    youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
+  });
 });
 
 const io = new Server(server, {
@@ -331,7 +333,11 @@ const listenWithFallback = (startPort, maxAttempts) => {
 
 const startServer = async () => {
   try {
-    await ensureJamendoCompatibleSchema();
+    if (!process.env.YOUTUBE_API_KEY) {
+      console.warn('YOUTUBE_API_KEY is missing. Search/trending/metadata endpoints will fail until it is configured.');
+    }
+
+    await ensureExternalMusicSchema();
     const activePort = await listenWithFallback(BASE_PORT, PORT_FALLBACK_ATTEMPTS);
     if (activePort !== BASE_PORT) {
       console.log(`🎵 Music App Backend running on fallback port ${activePort} (preferred ${BASE_PORT})`);

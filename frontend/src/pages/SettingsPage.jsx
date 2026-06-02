@@ -1,8 +1,12 @@
 import React from 'react';
-import AdminUpload from '../components/AdminUpload';
 
-function SettingsPage({ token }) {
-  return <AdminUpload token={token} />;
+function SettingsPage() {
+  return (
+    <section className="settings-page">
+      <h2>Settings</h2>
+      <p>Upload support has been removed. This area is reserved for future preferences.</p>
+    </section>
+  );
 }
 
 export default SettingsPage;

@@ -1,11 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, LogOut, PanelLeft, Search, UserCircle2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ChevronDown, LogOut, PanelLeft, Search, UserCircle2, X } from 'lucide-react';
+import SearchDropdown from './SearchDropdown';
 
 const navItems = ['Music', 'Podcasts', 'Pro'];
 
 function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout, onToggleSidebar }) {
   const [query, setQuery] = useState('');
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const initials = useMemo(() => {
     const parts = String(userName || 'Listener').trim().split(/\s+/).slice(0, 2);
@@ -23,13 +26,33 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (onSearchSubmit) {
-      onSearchSubmit(query.trim());
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setDropdownOpen(false);
+      return;
     }
+
+    onSearchSubmit?.(trimmed);
+    setDropdownOpen(false);
+  };
+
+  const handleSearchSelect = (result) => {
+    const nextQuery = String(result?.title || result?.query || '').trim();
+    if (!nextQuery) return;
+
+    setQuery(nextQuery);
+    setDropdownOpen(false);
+
+    onSearchSubmit?.(nextQuery);
   };
 
   return (
-    <header className="dashboard-header">
+    <motion.header
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.26, ease: 'easeOut' }}
+      className="dashboard-header"
+    >
       <div className="dashboard-header__left">
         <button
           type="button"
@@ -54,15 +77,43 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
       </div>
 
       <div className="dashboard-header__center">
-        <form className="dashboard-searchbar" onSubmit={handleSubmit} role="search">
-          <Search size={16} />
-          <input
-            type="search"
-            placeholder="Search "
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+        <div className="dashboard-searchwrap">
+          <form className="dashboard-searchbar" onSubmit={handleSubmit} role="search">
+            <Search size={16} className="transition-colors duration-200" />
+            <input
+              type="search"
+              placeholder="Search songs, artists, albums"
+              value={query}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                setQuery(nextValue);
+                setDropdownOpen(true);
+              }}
+              onFocus={() => setDropdownOpen(true)}
+              className="transition-all duration-200"
+            />
+            {query && (
+              <button
+                type="button"
+                className="dashboard-searchbar__clear"
+                aria-label="Clear search"
+                onClick={() => {
+                  setQuery('');
+                  setDropdownOpen(false);
+                }}
+              >
+                <X size={14} strokeWidth={2.2} />
+              </button>
+            )}
+          </form>
+
+          <SearchDropdown
+            isOpen={dropdownOpen && Boolean(query.trim())}
+            query={query}
+            onClose={() => setDropdownOpen(false)}
+            onSearchSelect={handleSearchSelect}
           />
-        </form>
+        </div>
       </div>
 
       <div className="dashboard-header__right">
@@ -96,7 +147,7 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
           </div>
         )}
       </div>
-    </header>
+    </motion.header>
   );
 }
 

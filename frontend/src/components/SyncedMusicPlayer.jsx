@@ -2,13 +2,25 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import useSocketRoom from '../hooks/useSocketRoom';
 import apiClient from '../api/client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 const DEFAULT_TRACK = {
   id: 'default-track',
   title: 'Now Playing',
   artist: 'Unknown Artist',
   file_url: '',
 };
+
+function normalizeSongList(payload) {
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  return [];
+}
 
 function normalizeTrackUrl(trackUrl) {
   if (!trackUrl) {
@@ -59,12 +71,21 @@ function SyncedMusicPlayer({
       }
 
       try {
-        const response = await apiClient.get('/api/music/songs?limit=1');
-        const songs = Array.isArray(response.data?.data)
-          ? response.data.data
-          : Array.isArray(response.data)
-            ? response.data
-            : [];
+        const endpoints = ['/api/music/songs?limit=1', '/api/music/trending?limit=1'];
+        let songs = [];
+
+        for (const endpoint of endpoints) {
+          try {
+            const response = await apiClient.get(endpoint);
+            songs = normalizeSongList(response.data);
+            if (songs.length > 0) {
+              break;
+            }
+          } catch (requestError) {
+            // Try next endpoint.
+          }
+        }
+
         const firstSong = songs[0] || null;
         if (firstSong?.id) {
           setCurrentTrack(firstSong);

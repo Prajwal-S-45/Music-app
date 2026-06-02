@@ -1,5 +1,15 @@
 const Playlist = require('../models/Playlist');
-const jamendoService = require('../services/jamendoService');
+const youtubeService = require('../services/youtubeService');
+
+const mapFallbackVideo = (videoId) => ({
+  id: videoId,
+  videoId,
+  title: 'Unavailable video',
+  thumbnail: null,
+  channelTitle: 'Unknown Channel',
+  source: 'youtube',
+  playable: true,
+});
 
 exports.createPlaylist = async (req, res) => {
   try {
@@ -91,20 +101,17 @@ exports.getPlaylistSongs = async (req, res) => {
     }
 
     const rows = await Playlist.getPlaylistSongs(playlistId);
-    const songs = await Promise.all(
-      rows.map(async (row) => {
-        try {
-          return await jamendoService.getSongById(row.song_id);
-        } catch (error) {
-          return {
-            id: row.song_id,
-            title: 'Unknown Title',
-            artist: 'Unknown Artist',
-            source: 'jamendo',
-          };
-        }
-      })
-    );
+    const videoIds = rows.map((row) => row.song_id);
+
+    let detailedSongs = [];
+    try {
+      detailedSongs = await youtubeService.getVideosByIds(videoIds);
+    } catch (error) {
+      console.warn('Could not fetch full YouTube metadata for playlist songs:', error.message);
+    }
+
+    const songsById = new Map(detailedSongs.map((song) => [song.id, song]));
+    const songs = videoIds.map((videoId) => songsById.get(videoId) || mapFallbackVideo(videoId));
 
     res.json({
       success: true,

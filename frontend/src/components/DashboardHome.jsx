@@ -1,19 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MusicCard from './MusicCard';
+import apiClient from '../api/client';
 
-const AUDIUS_APP_NAME = 'music_app';
-const AUDIUS_DISCOVERY_ENDPOINT = 'https://api.audius.co';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 const RECENTLY_PLAYED_KEY = 'music_app_recently_played';
 
 const DEFAULT_COVER =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1000&q=80';
 
-const getArtworkUrl = (artwork) => {
-  if (!artwork) return DEFAULT_COVER;
-
-  return artwork['1000x1000'] || artwork['480x480'] || artwork['150x150'] || DEFAULT_COVER;
-};
+const SKELETON_KEYS = ['recent-skel-1', 'recent-skel-2', 'recent-skel-3', 'recent-skel-4', 'recent-skel-5', 'recent-skel-6'];
 
 const formatDuration = (seconds) => {
   const parsed = Number(seconds);
@@ -26,21 +21,19 @@ const formatDuration = (seconds) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-const formatTrack = (track, discoveryProvider) => {
-  if (!track || !track.id || !discoveryProvider) {
+const formatTrack = (track) => {
+  if (!track || !(track.videoId || track.id)) {
     return null;
   }
 
-  const artworkUrl = getArtworkUrl(track.artwork);
-
   return {
-    id: track.id,
+    id: track.videoId || track.id,
+    videoId: track.videoId || track.id,
     title: track.title || 'Untitled Track',
-    artist: track.user?.name || 'Unknown Artist',
-    cover: `${API_URL}/api/music/artwork?url=${encodeURIComponent(artworkUrl)}`,
+    artist: track.channelTitle || track.artist || 'Unknown Artist',
+    cover: track.thumbnail || track.cover || DEFAULT_COVER,
     duration: Number(track.duration) || 0,
-    streamUrl: `${discoveryProvider}/v1/tracks/${track.id}/stream?app_name=${AUDIUS_APP_NAME}`,
-    source: 'audius',
+    source: 'youtube',
   };
 };
 
@@ -48,6 +41,11 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
   const [tracks, setTracks] = useState([]);
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [loading, setLoading] = useState(true);
+  const onTracksLoadedRef = useRef(onTracksLoaded);
+
+  useEffect(() => {
+    onTracksLoadedRef.current = onTracksLoaded;
+  }, [onTracksLoaded]);
 
   useEffect(() => {
     try {
@@ -82,27 +80,19 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
       try {
         setLoading(true);
 
-        const discoveryResponse = await fetch(AUDIUS_DISCOVERY_ENDPOINT);
-        const discoveryJson = await discoveryResponse.json();
-        const providers = Array.isArray(discoveryJson?.data) ? discoveryJson.data : [];
+        const response = await apiClient.get('/api/trending', {
+          params: { limit: 18 },
+        });
+        const trendingTracks = Array.isArray(response.data?.data)
+          ? response.data.data
+          : Array.isArray(response.data)
+            ? response.data
+            : [];
 
-        if (providers.length === 0) {
-          throw new Error('No Audius discovery providers available');
-        }
-
-        const discoveryProvider = providers[0].replace(/\/$/, '');
-        const trendingResponse = await fetch(
-          `${discoveryProvider}/v1/tracks/trending?app_name=${AUDIUS_APP_NAME}&limit=18&time=month`
-        );
-        const trendingJson = await trendingResponse.json();
-        const trendingTracks = Array.isArray(trendingJson?.data) ? trendingJson.data : [];
-
-        const normalized = trendingTracks
-          .map((track) => formatTrack(track, discoveryProvider))
-          .filter(Boolean);
+        const normalized = trendingTracks.map((track) => formatTrack(track)).filter(Boolean);
 
         setTracks(normalized);
-        onTracksLoaded?.(normalized);
+        onTracksLoadedRef.current?.(normalized);
       } catch (error) {
         console.error('Failed to load dashboard tracks:', error);
       } finally {
@@ -111,7 +101,7 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
     };
 
     loadTrending();
-  }, [onTracksLoaded]);
+  }, []);
 
   const recentCards = useMemo(() => {
     return recentlyPlayed.length > 0 ? recentlyPlayed.slice(0, 6) : tracks.slice(0, 6);
@@ -120,7 +110,7 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
   const curatedMixes = useMemo(() => {
     const source = tracks.length > 0 ? tracks : recentCards;
     return source.slice(0, 6).map((track, index) => ({
-      id: `${track.id}-${index}`,
+      id: `daily-${track.id}`,
       title: `Daily Mix ${index + 1}`,
       subtitle: `Inspired by ${track.artist}`,
       cover: track.cover,
@@ -131,7 +121,7 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
   const trendingMixes = useMemo(() => {
     const source = tracks.length > 0 ? tracks : recentCards;
     return source.slice(6, 12).map((track, index) => ({
-      id: `trend-${track.id}-${index}`,
+      id: `trend-${track.id}`,
       title: track.title,
       subtitle: `${track.artist} • ${formatDuration(track.duration)}`,
       cover: track.cover,
@@ -139,19 +129,21 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
     }));
   }, [tracks, recentCards]);
 
-  const playTrack = (track) => {
+  const playTrack = useCallback((track) => {
     if (!track) return;
 
     onTrackSelect?.(track);
 
     try {
-      const next = [{ ...track, playedAt: Date.now() }, ...recentlyPlayed.filter((item) => item.id !== track.id)].slice(0, 8);
-      window.localStorage.setItem(RECENTLY_PLAYED_KEY, JSON.stringify(next));
-      setRecentlyPlayed(next);
+      setRecentlyPlayed((currentRecent) => {
+        const next = [{ ...track, playedAt: Date.now() }, ...currentRecent.filter((item) => item.id !== track.id)].slice(0, 8);
+        window.localStorage.setItem(RECENTLY_PLAYED_KEY, JSON.stringify(next));
+        return next;
+      });
     } catch {
       // Ignore storage failures.
     }
-  };
+  }, [onTrackSelect]);
 
   return (
     <div className="dashboard-home">
@@ -176,7 +168,7 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
           </div>
           <div>
             <strong>HQ</strong>
-            <span>Audio streaming</span>
+            <span>YouTube playback</span>
           </div>
         </div>
       </section>
@@ -190,9 +182,9 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
         </div>
 
         <div className="dashboard-scroll-row" role="list" aria-label="Recently played tracks">
-          {(loading ? Array.from({ length: 6 }) : recentCards).map((item, index) => (
+          {(loading ? SKELETON_KEYS : recentCards).map((item) => (
             loading ? (
-              <div key={`recent-skel-${index}`} className="music-card skeleton" />
+              <div key={item} className="music-card skeleton" />
             ) : (
               <MusicCard
                 key={item.id}
@@ -201,13 +193,13 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
                 subtitle={`${item.artist} • ${formatDuration(item.duration)}`}
                 eyebrow="Recently played"
                 compact
-                onPlay={() => playTrack(item)}
+                track={item}
+                onPlayTrack={playTrack}
               />
             )
           ))}
         </div>
       </section>
-
       <section className="dashboard-section">
         <div className="dashboard-section__header">
           <div>
@@ -224,7 +216,8 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
               title={mix.title}
               subtitle={mix.subtitle}
               eyebrow="Playlist"
-              onPlay={() => playTrack(mix.track)}
+              track={mix.track}
+              onPlayTrack={playTrack}
             />
           ))}
         </div>
@@ -246,7 +239,8 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
               title={mix.title}
               subtitle={mix.subtitle}
               eyebrow="Trending"
-              onPlay={() => playTrack(mix.track)}
+              track={mix.track}
+              onPlayTrack={playTrack}
             />
           ))}
         </div>

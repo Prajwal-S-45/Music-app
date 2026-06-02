@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import apiClient from '../api/client';
-import '../styles/components/ExternalStreamPlayer.css';
+import '../styles/ExternalStreamPlayer.css';
 
 const FALLBACK_COVER =
   'https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=800&q=80';
