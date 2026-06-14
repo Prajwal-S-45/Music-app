@@ -1,164 +1,311 @@
-# 🎵 Music Streaming App
+# Music App
 
-A full-stack music streaming application built with React, Node.js/Express, and MySQL.
+A full-stack music streaming web app built with React, Vite, Node.js, Express, Socket.IO, and MySQL.
 
-## 🚀 Features
+The app lets users sign up, search YouTube-powered music results, play tracks, like songs, manage playlists, and join shared listening rooms with real-time playback sync.
 
-✅ User Authentication (Signup/Login with JWT)  
-✅ Browse & Search Songs  
-✅ Music Player with Play/Pause Controls  
-✅ Create & Manage Playlists  
-✅ Like/Favorite Songs  
-✅ Real-time Shared Listening Rooms  
-✅ User Profiles  
+## Features
 
-## 📋 Tech Stack
+- User signup, login, and JWT-based authentication
+- YouTube music search and trending music endpoints
+- Music player with queue support
+- Liked songs library
+- Playlist creation and song management
+- Shared listening rooms using Socket.IO
+- MySQL-backed users, playlists, liked songs, and room tables
+- Artwork proxy with fallback image for missing or blocked thumbnails
 
-**Frontend:**
-- React 18 + Vite
-- Axios for API calls
-- CSS3 for styling
+## Tech Stack
 
-**Backend:**
-- Node.js + Express
-- MySQL Database
-- Socket.IO (real-time sync)
-- JWT Authentication
-- bcryptjs for password hashing
+**Frontend**
 
-## 🛠 Installation
+- React 18
+- Vite
+- React Router
+- Axios
+- Socket.IO client
+- Framer Motion
+- CSS modules/stylesheets
 
-### 1. Database Setup
+**Backend**
 
-Open MySQL and run:
-```sql
-source database/schema.sql
+- Node.js
+- Express
+- MySQL 2
+- Socket.IO
+- JWT authentication
+- bcryptjs password hashing
+- YouTube Data API integration
+
+**Database**
+
+- MySQL
+- Schema file: `database/schema.sql`
+
+## Project Structure
+
+```text
+Music-app/
+|-- backend/
+|   |-- config/              # MySQL connection
+|   |-- controllers/         # Request handlers
+|   |-- middleware/          # Auth/admin middleware
+|   |-- models/              # Database access helpers
+|   |-- routes/              # Express route definitions
+|   |-- services/            # YouTube, room store, schema migration logic
+|   |-- uploads/             # Local uploaded/static files
+|   |-- server.js            # Express and Socket.IO entry point
+|   |-- .env.example         # Backend environment template
+|   `-- package.json
+|-- frontend/
+|   |-- src/
+|   |   |-- api/             # Axios client
+|   |   |-- components/      # Reusable UI components
+|   |   |-- hooks/           # React hooks
+|   |   |-- pages/           # Route-level pages
+|   |   |-- realtime/        # Socket client
+|   |   |-- routes/          # App routes
+|   |   |-- styles/          # CSS files and layout notes
+|   |   |-- App.jsx
+|   |   `-- main.jsx
+|   |-- index.html
+|   |-- vite.config.js
+|   `-- package.json
+|-- database/
+|   `-- schema.sql           # Database schema and sample songs
+|-- API_REFERENCE.md         # More detailed API notes
+|-- START.bat                # Windows setup helper notes
+|-- start.sh                 # Linux/macOS startup helper
+`-- README.md
 ```
 
-Or manually create the database and tables using [schema.sql](database/schema.sql)
+## Prerequisites
 
-### 2. Backend Setup
+Install these before running the project:
+
+- Node.js 18 or newer
+- npm
+- MySQL server
+- YouTube Data API v3 key
+
+## Setup
+
+### 1. Clone or Open the Project
+
+```bash
+cd Music-app
+```
+
+### 2. Create the Database
+
+Start MySQL, then run the schema file from the project root:
+
+```sql
+source database/schema.sql;
+```
+
+The schema creates the `music_app` database, required tables, and a few sample songs.
+
+### 3. Configure the Backend
 
 ```bash
 cd backend
-
-# Copy environment variables
-copy .env.example .env
-
-# Install dependencies
 npm install
+copy .env.example .env
+```
 
-# Start the server
+On macOS/Linux, use:
+
+```bash
+cp .env.example .env
+```
+
+Update `backend/.env` with your local values:
+
+```env
+PORT=5000
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=music_app
+JWT_SECRET=change_this_to_a_secure_secret
+ADMIN_EMAILS=admin@example.com
+NODE_ENV=development
+YOUTUBE_API_KEY=your_youtube_data_api_key_here
+```
+
+Optional backend variables:
+
+- `FRONTEND_URL` - comma-separated allowed frontend origins. Defaults to `http://localhost:5173,http://localhost:3000`.
+- `PORT_FALLBACK_ATTEMPTS` - number of ports to try if `PORT` is already busy. Defaults to `5`.
+
+### 4. Configure the Frontend
+
+```bash
+cd ../frontend
+npm install
+```
+
+The frontend uses `http://localhost:5000` as the default API URL. If your backend runs somewhere else, create `frontend/.env`:
+
+```env
+VITE_API_URL=http://localhost:5000
+VITE_API_FALLBACK_URL=http://localhost:5001
+```
+
+## Running the App
+
+Open two terminals.
+
+Terminal 1, backend:
+
+```bash
+cd backend
 npm run dev
 ```
 
-Server runs at: `http://localhost:5000`
+Backend URL:
 
-### 3. Frontend Setup
+```text
+http://localhost:5000
+```
+
+Health check:
+
+```text
+http://localhost:5000/api/health
+```
+
+Terminal 2, frontend:
 
 ```bash
 cd frontend
-
-# Install dependencies
-npm install
-
-# Start dev server
 npm run dev
 ```
 
-App runs at: `http://localhost:3000`
+Frontend URL:
 
-## 📚 API Endpoints
+```text
+http://localhost:3000
+```
 
-### Users
-- `POST /api/users/signup` - Register new user
-- `POST /api/users/login` - Login user
-- `GET /api/users/profile` - Get user profile (requires auth)
+## Main API Routes
 
-### Music
-- `GET /api/music/search?query=term` - Search YouTube songs (music namespace)
-- `GET /api/music/trending` - Trending YouTube songs (music namespace)
-- `GET /api/search?q=term` - Search YouTube songs (primary endpoint)
-- `GET /api/trending` - Fetch trending YouTube music videos (India-focused)
-- `GET /api/music/search/all?query=term` - Backward-compatible alias to YouTube search
-- `GET /api/music/artwork?url=<encoded-image-url>` - Safe artwork proxy/fallback
-- `POST /api/music/like` - Like a song (requires auth)
-- `GET /api/music/liked` - Get liked songs (requires auth)
+Base URL:
+
+```text
+http://localhost:5000/api
+```
+
+### Auth
+
+- `POST /users/signup` - create a user account
+- `POST /users/login` - login and receive a JWT token
+- `GET /users/profile` - get the logged-in user profile
+
+### Music and YouTube
+
+- `GET /search?q=term` - search YouTube music
+- `GET /trending` - get trending music
+- `GET /artists` - get artist data
+- `GET /cache/stats` - get backend cache stats
+- `GET /music/search?query=term` - music namespace search alias
+- `GET /music/trending` - music namespace trending alias
+- `GET /music/search/all?query=term` - backward-compatible search alias
+- `GET /music/songs` - get local songs
+- `GET /music/artwork?url=<encoded-url>` - fetch artwork or fallback image
+- `POST /music/like` - like a song
+- `DELETE /music/like/:songId` - unlike a song
+- `GET /music/liked` - get liked songs
 
 ### Playlists
-- `POST /api/playlists/create` - Create playlist (requires auth)
-- `GET /api/playlists` - Get user's playlists (requires auth)
-- `POST /api/playlists/add-song` - Add song to playlist (requires auth)
-- `GET /api/playlists/:playlistId/songs` - Get playlist songs
 
-## 🔐 Authentication
+- `POST /playlists/create` - create a playlist
+- `GET /playlists` - get the current user's playlists
+- `POST /playlists/add-song` - add a song to a playlist
+- `DELETE /playlists/remove-song` - remove a song from a playlist
+- `GET /playlists/:playlistId/songs` - get songs in a playlist
 
-The app uses JWT tokens for authentication. When you login/signup:
-1. A JWT token is returned
-2. Store it in localStorage
-3. Include it in Authorization header: `Bearer <token>`
+### Rooms
 
-## 📁 Project Structure
+- `POST /rooms/create` - create a shared listening room
+- `POST /rooms/join` - join a room
+- `GET /rooms/:roomId` - get room state
+- `PUT /rooms/:roomId/state` - update room playback state
 
+For request/response examples, see `API_REFERENCE.md`.
+
+## Real-Time Listening Rooms
+
+The backend runs Socket.IO on the same server as Express. The frontend socket client connects to the backend and supports room events such as:
+
+- create room
+- join room
+- leave room
+- play
+- pause
+- seek
+- change song
+- periodic room sync
+
+Room state is handled in `backend/services/roomStore.js`, and frontend room logic is in `frontend/src/hooks/useSocketRoom.js`.
+
+## Authentication Flow
+
+1. A user signs up or logs in.
+2. The backend returns a JWT token.
+3. The frontend stores the token in `localStorage`.
+4. Axios automatically sends `Authorization: Bearer <token>` for protected endpoints.
+
+Protected routes include profile, likes, and playlists.
+
+## Useful Commands
+
+Backend:
+
+```bash
+cd backend
+npm run dev      # start with nodemon
+npm start        # start with node
+node health-check.js
 ```
-Music-app/
-├── backend/
-│   ├── config/          (Database config)
-│   ├── controllers/      (Business logic)
-│   ├── models/          (Database models)
-│   ├── middleware/      (Auth middleware)
-│   ├── routes/          (API routes)
-│   ├── server.js        (Main server file)
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── components/  (React components)
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── index.html
-│   ├── vite.config.js
-│   └── package.json
-└── database/
-    └── schema.sql       (Database schema)
+
+Frontend:
+
+```bash
+cd frontend
+npm run dev      # start Vite dev server on port 3000
+npm run build    # production build
+npm run preview  # preview production build
 ```
 
-## 🚦 Getting Started
+## Troubleshooting
 
-1. **Setup Database** - Run schema.sql in MySQL
-2. **Start Backend** - Run `npm run dev` in backend folder
-3. **Start Frontend** - Run `npm run dev` in frontend folder
-4. **Access App** - Open http://localhost:3000
+**Backend cannot connect to MySQL**
 
-## 🌐 API Keys / Env
+- Make sure MySQL is running.
+- Confirm `DB_HOST`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME` in `backend/.env`.
+- Run `database/schema.sql` before starting the backend.
 
-Set these in `backend/.env` before running backend:
+**Search or trending endpoints fail**
 
-- `YOUTUBE_API_KEY` - YouTube Data API v3 key
+- Make sure `YOUTUBE_API_KEY` is set in `backend/.env`.
+- Confirm the key has access to YouTube Data API v3.
 
-## 🎯 Next Steps
+**Frontend cannot reach backend**
 
-- [ ] Add offline mode support
-- [ ] Implement recommendations engine
-- [ ] Add social features (share playlists)
-- [ ] Mobile app (React Native)
-- [ ] CDN integration for songs
-- [ ] Advanced search filters
-- [ ] User follows/friends system
+- Check `http://localhost:5000/api/health`.
+- Make sure `VITE_API_URL` matches the backend URL if you changed the backend port.
+- If port `5000` is busy, the backend may start on a fallback port such as `5001`.
 
-## 📝 Notes
+**Port already in use**
 
-- Default database: `music_app`
-- Backend API base: `http://localhost:5000`
-- Frontend development: `http://localhost:3000`
-- Ensure MySQL is running before starting backend
+- Backend starts at `PORT` from `.env` and can try fallback ports.
+- Frontend is configured in `frontend/vite.config.js` to use port `3000`.
 
-## 💡 Tips
+## Notes
 
-1. Change JWT_SECRET in `.env` for production
-2. Use environment variables for sensitive data
-3. Song playback uses YouTube `videoId` data
-4. Test with sample songs in the database
-
----
-
-Built with ❤️ for music lovers
+- Do not commit real `.env` secrets.
+- Change `JWT_SECRET` before using the app outside local development.
+- The app stores YouTube video IDs as song IDs for external music results.
+- `database/schema.sql` includes sample local songs, but YouTube search requires an API key.
