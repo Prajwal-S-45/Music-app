@@ -98,6 +98,18 @@
   background: rgba(15, 23, 42, 0.9);
 }
 
+.player-controls button:focus-visible,
+.song-action:focus-visible,
+.room-controls button:focus-visible,
+.room-meta .copy-room:focus-visible,
+.queue-item button:focus-visible,
+.mini-player-actions button:focus-visible,
+.song-item:focus-visible {
+  outline: 2px solid rgba(16, 185, 129, 0.6);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.16);
+}
+
 .duration {
   font-size: 12px;
   color: rgba(163, 180, 204, 0.9);
