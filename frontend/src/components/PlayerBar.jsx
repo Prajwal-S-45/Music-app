@@ -12,6 +12,8 @@ import {
   SkipForward,
   Volume2,
 } from 'lucide-react';
+import apiClient from '../api/client';
+import { buildSongLikePayload } from '../utils/songPayload';
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1000&q=80';
@@ -52,7 +54,16 @@ const formatTime = (seconds) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-function PlayerBar({ track, queue = [], isQueueOpen = false, isCompactLayout = false, onSelectTrack, onToggleQueue }) {
+function PlayerBar({
+  track,
+  queue = [],
+  isQueueOpen = false,
+  isCompactLayout = false,
+  token,
+  onSelectTrack,
+  onToggleQueue,
+  onLikeUpdate,
+}) {
   const audioRef = useRef(null);
   const ytContainerRef = useRef(null);
   const ytPlayerRef = useRef(null);
@@ -87,6 +98,31 @@ function PlayerBar({ track, queue = [], isQueueOpen = false, isCompactLayout = f
     }),
     [progressPercent]
   );
+
+  useEffect(() => {
+    setIsLiked(false);
+  }, [activeTrackId]);
+
+  const handleLikeCurrentTrack = useCallback(async () => {
+    if (!track || !activeTrackId || !token) {
+      return;
+    }
+
+    setIsLiked(true);
+
+    try {
+      await apiClient.post(
+        '/api/music/like',
+        buildSongLikePayload(track),
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      onLikeUpdate?.();
+    } catch (error) {
+      if (error.response?.status !== 400) {
+        setIsLiked(false);
+      }
+    }
+  }, [activeTrackId, onLikeUpdate, token, track]);
 
   const stopProgressTimer = useCallback(() => {
     if (progressTimerRef.current) {
@@ -176,7 +212,7 @@ function PlayerBar({ track, queue = [], isQueueOpen = false, isCompactLayout = f
         .then(() => setIsPlaying(true))
         .catch(() => setIsPlaying(false));
     }
-  }, [isYouTubeTrack, track?.streamUrl, track?.id]);
+  }, [isYouTubeTrack, track?.streamUrl, track?.id, track?.requestId, track?.shouldAutoPlay]);
 
   useEffect(() => {
     const videoId = track?.videoId || null;
@@ -219,7 +255,7 @@ function PlayerBar({ track, queue = [], isQueueOpen = false, isCompactLayout = f
                 if (state === YT.PlayerState.PLAYING) {
                   setIsPlaying(true);
                   startProgressTimer();
-                } else if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.BUFFERING) {
+                } else if (state === YT.PlayerState.PAUSED) {
                   setIsPlaying(false);
                 } else if (state === YT.PlayerState.ENDED) {
                   setIsPlaying(false);
@@ -255,7 +291,7 @@ function PlayerBar({ track, queue = [], isQueueOpen = false, isCompactLayout = f
     return () => {
       mounted = false;
     };
-  }, [isYouTubeTrack, track?.videoId, track?.shouldAutoPlay, volume, startProgressTimer, stopProgressTimer]);
+  }, [isYouTubeTrack, track?.videoId, track?.requestId, track?.shouldAutoPlay, volume, startProgressTimer, stopProgressTimer]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -340,106 +376,150 @@ function PlayerBar({ track, queue = [], isQueueOpen = false, isCompactLayout = f
       />
 
       <motion.footer
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: 'easeOut' }}
+        transition={{ duration: 0.32, ease: 'easeOut' }}
         className="player-bar"
       >
-        <div className="player-bar__ambient player-bar__ambient--left" />
-        <div className="player-bar__ambient player-bar__ambient--right" />
-
-        <div className="player-bar__track">
-          <div className="player-bar__art-shell">
-            <img
-              src={track?.cover || track?.image || track?.thumbnail || FALLBACK_IMAGE}
-              alt={track?.title || 'Now playing'}
-              onError={(event) => {
-                event.currentTarget.onerror = null;
-                event.currentTarget.src = FALLBACK_IMAGE;
-              }}
-            />
-            <div className="player-bar__art-glow" />
+        <div className="player-bar__body">
+          {/* LEFT SECTION: Now Playing Info */}
+          <div className="player-bar__left">
+            <div className="player-bar__art-wrap">
+              <motion.img
+                animate={isPlaying ? { scale: [1, 1.02, 1] } : { scale: 1 }}
+                transition={{ duration: 2, repeat: Infinity }}
+                src={track?.cover || track?.image || track?.thumbnail || FALLBACK_IMAGE}
+                alt={track?.title}
+                onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+              />
+              {isPlaying && (
+                <div className="player-bar__playback-indicator">
+                  <div className="bar" />
+                  <div className="bar" />
+                  <div className="bar" />
+                </div>
+              )}
+            </div>
+            
+            <div className="player-bar__info">
+              <div className="player-bar__song-row">
+                <strong className="song-name" title={track?.title}>
+                  {track?.title || 'Not Playing'}
+                </strong>
+                <motion.button
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.9 }}
+                  className={`player-bar__heart ${isLiked ? 'active' : ''}`}
+                  onClick={handleLikeCurrentTrack}
+                  disabled={!track || !token}
+                  aria-label={isLiked ? 'Track liked' : 'Like current track'}
+                >
+                  <Heart size={16} fill={isLiked ? 'var(--accent)' : 'none'} />
+                </motion.button>
+              </div>
+              <span className="album-name" title={track?.album}>
+                {track?.album || track?.movie || 'Single'}
+              </span>
+              <span className="artist-name" title={track?.artist}>
+                {track?.artist || track?.channelTitle || 'Unknown Artist'}
+              </span>
+            </div>
           </div>
 
-          <div className="player-bar__meta">
-            <span className="player-bar__eyebrow">Now playing</span>
-            <strong>{track?.title || 'Select a track'}</strong>
-            <p>{track?.artist || track?.channelTitle || 'Premium audio experience'}</p>
+          {/* CENTER SECTION: Controls & Progress */}
+          <div className="player-bar__center">
+            <div className="player-bar__controls">
+              <motion.button
+                whileHover={{ scale: 1.15 }}
+                className={`player-bar__btn-ghost ${isShuffle ? 'active' : ''}`}
+                onClick={() => setIsShuffle(!isShuffle)}
+              >
+                <Shuffle size={16} />
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.15 }}
+                className="player-bar__btn-ghost"
+                onClick={handlePrevious}
+              >
+                <SkipBack size={20} />
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                className="player-bar__btn-play"
+                onClick={handleTogglePlay}
+              >
+                {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="play-icon-offset" />}
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.15 }}
+                className="player-bar__btn-ghost"
+                onClick={handleNext}
+              >
+                <SkipForward size={20} />
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.15 }}
+                className={`player-bar__btn-ghost ${isRepeat ? 'active' : ''}`}
+                onClick={() => setIsRepeat(!isRepeat)}
+              >
+                <Repeat size={16} />
+              </motion.button>
+            </div>
+
+            <div className="player-bar__progress-container">
+              <span className="time-label">{formatTime(currentTime)}</span>
+              <div className="player-bar__progress-rail">
+                <input
+                  type="range"
+                  min="0"
+                  max={Math.max(duration, 1)}
+                  step="1"
+                  value={Math.min(currentTime, Math.max(duration, 1))}
+                  onChange={handleSeek}
+                  style={progressStyle}
+                />
+              </div>
+              <span className="time-label">{formatTime(duration)}</span>
+            </div>
           </div>
 
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className={`player-bar__like ${isLiked ? 'active' : ''}`}
-            onClick={() => setIsLiked((value) => !value)}
-            aria-label={isLiked ? 'Unlike song' : 'Like song'}
-          >
-            <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
-          </motion.button>
-        </div>
+          {/* RIGHT SECTION: Utils */}
+          <div className="player-bar__right">
+            <div className="player-bar__volume-group">
+              <Volume2 size={18} className="vol-icon" />
+              <div className="volume-slider-container">
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={volume}
+                  onChange={(e) => setVolume(Number(e.target.value))}
+                />
+              </div>
+            </div>
 
-        <div className="player-bar__center">
-          <div className="player-bar__controls">
-            <motion.button type="button" whileHover={{ y: -1, scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setIsShuffle((value) => !value)} className={isShuffle ? 'active' : ''}>
-              <Shuffle size={16} />
+            <motion.button
+              whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.08)' }}
+              className={`player-bar__btn-util ${isQueueOpen ? 'active' : ''}`}
+              onClick={onToggleQueue}
+            >
+              <ListMusic size={18} />
             </motion.button>
-            <motion.button type="button" whileHover={{ y: -1, scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handlePrevious}>
-              <SkipBack size={18} />
-            </motion.button>
-            <motion.button type="button" whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} className="player-bar__play" onClick={handleTogglePlay}>
-              {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-            </motion.button>
-            <motion.button type="button" whileHover={{ y: -1, scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleNext}>
-              <SkipForward size={18} />
-            </motion.button>
-            <motion.button type="button" whileHover={{ y: -1, scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setIsRepeat((value) => !value)} className={isRepeat ? 'active' : ''}>
-              <Repeat size={16} />
-            </motion.button>
-          </div>
 
-          <div className="player-bar__progress">
-            <span>{formatTime(currentTime)}</span>
-            <input
-              type="range"
-              min="0"
-              max={Math.max(duration, 1)}
-              step="1"
-              value={Math.min(currentTime, Math.max(duration, 1))}
-              onChange={handleSeek}
-              style={progressStyle}
-            />
-            <span>{formatTime(duration)}</span>
-          </div>
-        </div>
-
-        <div className="player-bar__right">
-          <div className="player-bar__volume">
-            <Volume2 size={16} />
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={volume}
-              onChange={(event) => setVolume(Number(event.target.value))}
-            />
-          </div>
-          <motion.button
-            type="button"
-            whileHover={{ y: -1, scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
-            aria-label="Toggle queue"
-            aria-controls="app-queue"
-            aria-expanded={isQueueOpen}
-            aria-pressed={isQueueOpen}
-            onClick={onToggleQueue}
-          >
-            <ListMusic size={16} />
-          </motion.button>
-          <motion.button type="button" whileHover={{ y: -1, scale: 1.04 }} whileTap={{ scale: 0.96 }} aria-label="Expand player">
-            <Expand size={16} />
-          </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.08)' }}
+              className="player-bar__btn-util"
+              onClick={() => { /* TODO: implement fullscreen/expand */ }}
+              title="Expand (coming soon)"
+            >
+              <Expand size={18} />
+            </motion.button>          </div>
         </div>
       </motion.footer>
     </>
