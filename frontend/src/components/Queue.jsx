@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   BookmarkPlus,
+  ChevronDown,
   ChevronLeft,
+  ChevronUp,
   GripVertical,
   ListMusic,
   MoreHorizontalIcon,
@@ -15,6 +17,18 @@ import { saveQueueToLibrary } from '../utils/savedQueues';
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1000&q=80';
+
+const formatQueueDuration = (seconds) => {
+  const totalSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+};
+
+const getTrackPlaybackId = (item) => item?.videoId || item?.id;
+
+const getQueueItemKey = (item, index) =>
+  item?.queueItemId || item?.id || `${item?.title || 'queue-item'}-${index}`;
 
 function Queue({
   items = [],
@@ -46,6 +60,14 @@ function Queue({
   const menuRef = useRef(null);
   const listRef = useRef(null);
   const itemRefs = useRef(new Map());
+
+  const queueDuration = useMemo(
+    () => items.reduce((total, item) => total + (Number(item?.duration) || 0), 0),
+    [items]
+  );
+  const queueSummary = `${items.length} ${items.length === 1 ? 'song' : 'songs'}${
+    queueDuration > 0 ? ` - ${formatQueueDuration(queueDuration)}` : ''
+  }`;
 
   const showStatus = (type, message) => {
     setSaveStatus({ type, message });
@@ -84,7 +106,10 @@ function Queue({
     };
   }, []);
 
-  const activeIndex = useMemo(() => items.findIndex((item) => item.id === activeTrackId), [items, activeTrackId]);
+  const activeIndex = useMemo(
+    () => items.findIndex((item) => getTrackPlaybackId(item) === activeTrackId),
+    [items, activeTrackId]
+  );
 
   const scrollToNowPlaying = () => {
     if (!listRef.current || activeTrackId == null) {
@@ -207,8 +232,39 @@ function Queue({
   };
 
   const handleMenuToggle = (event) => {
+    event.preventDefault();
     event.stopPropagation();
     setIsMenuOpen((value) => !value);
+  };
+
+  const handleEditQueuePointerDown = (event) => {
+    if (event.pointerType === 'mouse' || event.pointerType === 'touch') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleEditQueue();
+    }
+  };
+
+  const handleEditQueueClick = (event) => {
+    event.stopPropagation();
+    if (event.detail === 0) {
+      handleEditQueue();
+    }
+  };
+
+  const handleFindNowPlayingPointerDown = (event) => {
+    if (event.pointerType === 'mouse' || event.pointerType === 'touch') {
+      event.preventDefault();
+      event.stopPropagation();
+      handleFindNowPlaying();
+    }
+  };
+
+  const handleFindNowPlayingClick = (event) => {
+    event.stopPropagation();
+    if (event.detail === 0) {
+      handleFindNowPlaying();
+    }
   };
 
   const handleDragStart = (index) => {
@@ -258,6 +314,16 @@ function Queue({
     onRemoveQueueItem?.(queueItemId);
   };
 
+  const handleMoveItem = (event, fromIndex, toIndex) => {
+    event.stopPropagation();
+
+    if (fromIndex === toIndex || toIndex < 0 || toIndex >= items.length) {
+      return;
+    }
+
+    onReorderQueue?.(fromIndex, toIndex);
+  };
+
   const toggleSelectedItem = (queueItemId) => {
     setSelectedQueueItems((currentSelected) =>
       currentSelected.includes(queueItemId)
@@ -300,9 +366,14 @@ function Queue({
       role="complementary"
       aria-label="Playback queue"
       onMouseEnter={() => !isCompactLayout && setIsHovered(true)}
-      onMouseLeave={() => !isCompactLayout && setIsHovered(false)}
+      onMouseLeave={() => {
+        if (!isCompactLayout) {
+          setIsHovered(false);
+          setIsMenuOpen(false);
+        }
+      }}
       animate={{
-        width: isCompactLayout ? 'auto' : isHovered || isEditMode ? 'clamp(460px, 32vw, 540px)' : '280px',
+        width: isCompactLayout ? 'auto' : isHovered || isEditMode ? 'clamp(400px, 30vw, 500px)' : '72px',
       }}
       transition={{
         width: {
@@ -321,9 +392,12 @@ function Queue({
           opacity: { duration: 0.22 },
         }}
       >
-        <p>
+        <p className="dashboard-queue__title">
           <ListMusic size={16} />
-          <span>Queue</span>
+          <span className="dashboard-queue__title-copy">
+            <span className="dashboard-queue__title-text">Queue</span>
+            <small className="dashboard-queue__meta">{queueSummary}</small>
+          </span>
         </p>
         <div className="dashboard-queue__header-actions" ref={menuRef}>
           <motion.button
@@ -374,12 +448,28 @@ function Queue({
               <MoreHorizontalIcon size={16} />
             </button>
             {isMenuOpen && (
-              <div className="dashboard-queue__menu" role="menu" aria-label="Queue options">
-                <button type="button" role="menuitem" onClick={handleEditQueue}>
+              <div
+                className="dashboard-queue__menu"
+                role="menu"
+                aria-label="Queue options"
+                onPointerDown={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onPointerDown={handleEditQueuePointerDown}
+                  onClick={handleEditQueueClick}
+                >
                   <GripVertical size={14} />
                   {isEditMode ? 'Close Edit Queue' : 'Edit Queue'}
                 </button>
-                <button type="button" role="menuitem" onClick={handleFindNowPlaying}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onPointerDown={handleFindNowPlayingPointerDown}
+                  onClick={handleFindNowPlayingClick}
+                >
                   <ListMusic size={14} />
                   Find Now Playing
                 </button>
@@ -421,17 +511,18 @@ function Queue({
         ) : (
           items.map((item, index) => (
             <motion.div
-              key={item.id || `${item.title}-${index}`}
+              key={getQueueItemKey(item, index)}
               ref={(node) => {
-                if (node) {
-                  itemRefs.current.set(item.id, node);
-                } else {
-                  itemRefs.current.delete(item.id);
+                const playbackId = getTrackPlaybackId(item);
+                if (node && playbackId) {
+                  itemRefs.current.set(playbackId, node);
+                } else if (playbackId) {
+                  itemRefs.current.delete(playbackId);
                 }
               }}
-              className={`dashboard-queue__item ${activeTrackId === item.id ? 'active' : ''} ${
+              className={`dashboard-queue__item ${activeTrackId === getTrackPlaybackId(item) ? 'active' : ''} ${
                 isEditMode ? 'editing' : ''
-              } ${selectedQueueItems.includes(item.id) ? 'selected' : ''} ${
+              } ${selectedQueueItems.includes(getQueueItemKey(item, index)) ? 'selected' : ''} ${
                 dragOverIndex === index ? 'drop-target' : ''
               }`}
               draggable={isEditMode}
@@ -445,7 +536,7 @@ function Queue({
                     return;
                   }
 
-                  toggleSelectedItem(item.id);
+                  toggleSelectedItem(getQueueItemKey(item, index));
                   return;
                 }
 
@@ -484,8 +575,8 @@ function Queue({
                 <label className="dashboard-queue__select-box" onClick={(event) => event.stopPropagation()}>
                   <input
                     type="checkbox"
-                    checked={selectedQueueItems.includes(item.id)}
-                    onChange={() => toggleSelectedItem(item.id)}
+                    checked={selectedQueueItems.includes(getQueueItemKey(item, index))}
+                    onChange={() => toggleSelectedItem(getQueueItemKey(item, index))}
                     aria-label={`Select ${item.title}`}
                   />
                   <span />
@@ -517,11 +608,38 @@ function Queue({
                 <strong title={item.title}>{item.title}</strong>
                 <span title={item.artist || item.subtitle}>{item.artist || item.subtitle}</span>
               </motion.div>
+              {!isEditMode && item.duration ? (
+                <span className="dashboard-queue__item-duration">{formatQueueDuration(item.duration)}</span>
+              ) : null}
+              {isEditMode && (
+                <div className="dashboard-queue__move-controls" aria-label={`Move ${item.title}`}>
+                  <button
+                    type="button"
+                    className="dashboard-queue__move-btn"
+                    onClick={(event) => handleMoveItem(event, index, index - 1)}
+                    disabled={index === 0}
+                    aria-label={`Move ${item.title} up`}
+                    title="Move up"
+                  >
+                    <ChevronUp size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    className="dashboard-queue__move-btn"
+                    onClick={(event) => handleMoveItem(event, index, index + 1)}
+                    disabled={index >= items.length - 1}
+                    aria-label={`Move ${item.title} down`}
+                    title="Move down"
+                  >
+                    <ChevronDown size={12} />
+                  </button>
+                </div>
+              )}
               {isEditMode && (
                 <button
                   type="button"
                   className="dashboard-queue__remove-btn"
-                  onClick={(event) => handleRemoveItem(event, item.id)}
+                  onClick={(event) => handleRemoveItem(event, getQueueItemKey(item, index))}
                   aria-label={`Remove ${item.title} from queue`}
                   title="Remove song"
                 >
