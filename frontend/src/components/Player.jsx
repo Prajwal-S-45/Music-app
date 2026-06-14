@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import useSocketRoom from '../hooks/useSocketRoom';
+import { buildSongLikePayload } from '../utils/songPayload';
 import '../styles/Player.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 let ytApiPromise = null;
 
 const loadYouTubeApi = () => {
@@ -451,7 +452,7 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
 
             if (state === YT.PlayerState.PLAYING) {
               setIsPlaying(true);
-            } else if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.BUFFERING) {
+            } else if (state === YT.PlayerState.PAUSED) {
               setIsPlaying(false);
             } else if (state === YT.PlayerState.ENDED) {
               setIsPlaying(false);
@@ -608,7 +609,7 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
     try {
       await axios.post(
         `${API_URL}/api/music/like`,
-        { songId: song.id },
+        buildSongLikePayload(song),
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
