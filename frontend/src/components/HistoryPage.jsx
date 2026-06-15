@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Album,
@@ -80,6 +80,12 @@ const getActivityText = (item) => {
   return `${meta.label} ${getRelativeTime(item.timestamp)}`;
 };
 
+const getYoutubeId = (...values) => {
+  return values
+    .map((value) => String(value || '').trim())
+    .find((value) => /^[A-Za-z0-9_-]{11}$/.test(value));
+};
+
 function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
@@ -88,12 +94,14 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
   const [hasMore, setHasMore] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [showClearModal, setShowClearModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const loaderRef = useRef(null);
   const navigate = useNavigate();
 
   const fetchHistory = useCallback(async ({ offset = 0, append = false } = {}) => {
     if (!token) {
       setItems([]);
+      setErrorMessage('');
       setLoading(false);
       return;
     }
@@ -105,6 +113,7 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
     }
 
     try {
+      setErrorMessage('');
       const response = await apiClient.get('/api/history', {
         params: { limit: PAGE_SIZE, offset },
       });
@@ -112,6 +121,9 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
       const nextItems = Array.isArray(response.data?.data) ? response.data.data : [];
       setItems((current) => (append ? [...current, ...nextItems] : nextItems));
       setHasMore(Boolean(response.data?.hasMore));
+    } catch (error) {
+      console.error('Could not load history:', error);
+      setErrorMessage(append ? 'Could not load more history.' : 'Could not load history right now.');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -153,11 +165,18 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
 
   const handleOpen = (item) => {
     setOpenMenuId(null);
+    setErrorMessage('');
 
     if (item.type === 'song') {
+      const videoId = getYoutubeId(item.metadata?.videoId, item.metadata?.id, item.target);
+      if (!videoId) {
+        setErrorMessage('Could not play this history item because its video is unavailable.');
+        return;
+      }
+
       onPlayTrack?.({
-        id: item.metadata?.id || item.metadata?.videoId || item.target || item.title,
-        videoId: item.metadata?.videoId || item.metadata?.id || item.target,
+        id: videoId,
+        videoId,
         title: item.title,
         artist: item.subtitle,
         cover: item.image,
@@ -189,14 +208,26 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
 
   const handleRemove = async (itemId) => {
     setOpenMenuId(null);
-    setItems((current) => current.filter((item) => item.id !== itemId));
-    await apiClient.delete(`/api/history/${itemId}`);
+    try {
+      setErrorMessage('');
+      await apiClient.delete(`/api/history/${itemId}`);
+      setItems((current) => current.filter((item) => item.id !== itemId));
+    } catch (error) {
+      console.error('Could not remove history item:', error);
+      setErrorMessage('Could not remove this history item. Please try again.');
+    }
   };
 
   const handleClear = async () => {
-    await apiClient.delete('/api/history');
-    setItems([]);
-    setShowClearModal(false);
+    try {
+      setErrorMessage('');
+      await apiClient.delete('/api/history');
+      setItems([]);
+      setShowClearModal(false);
+    } catch (error) {
+      console.error('Could not clear history:', error);
+      setErrorMessage('Could not clear history. Please try again.');
+    }
   };
 
   const renderSkeletons = () => (
@@ -252,6 +283,10 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
           </motion.button>
         </div>
       </header>
+
+      {errorMessage ? (
+        <p className="history-page__error" role="alert">{errorMessage}</p>
+      ) : null}
 
       {loading ? (
         renderSkeletons()
@@ -358,9 +393,6 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
                               <button type="button" onClick={() => handleOpen(item)}>
                                 <Play size={15} /> <span>Play Again</span>
                               </button>
-                              <button type="button" onClick={() => handleOpen(item)}>
-                                <ListMusic size={15} /> <span>Open Details</span>
-                              </button>
                               <button type="button" className="danger" onClick={() => handleRemove(item.id)}>
                                 <Trash2 size={15} /> <span>Remove From History</span>
                               </button>
@@ -400,6 +432,9 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
             >
               <h2 id="history-clear-title">Clear all history?</h2>
               <p>This action cannot be undone.</p>
+              {errorMessage ? (
+                <p className="history-modal__error" role="alert">{errorMessage}</p>
+              ) : null}
               <div>
                 <button type="button" onClick={() => setShowClearModal(false)}>Cancel</button>
                 <button type="button" className="danger" onClick={handleClear}>Clear</button>
