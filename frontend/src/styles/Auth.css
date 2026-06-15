@@ -73,7 +73,7 @@
   text-decoration: underline;
 }
 
-.error {
+.auth-container .error {
   background: #f8d7da;
   color: #721c24;
   padding: 10px;
