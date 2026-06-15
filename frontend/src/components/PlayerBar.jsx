@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Expand,
@@ -58,7 +58,6 @@ function PlayerBar({
   track,
   queue = [],
   isQueueOpen = false,
-  isCompactLayout = false,
   token,
   onSelectTrack,
   onToggleQueue,
