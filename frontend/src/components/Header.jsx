@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import '../styles/Header.css';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -24,7 +24,6 @@ const languageOptions = [
   { value: 'KANNADA', label: 'Kannada', flag: 'KA' },
   { value: 'ENGLISH', label: 'English', flag: 'EN' },
   { value: 'HINDI', label: 'Hindi', flag: 'HI' },
-  { value: 'EN', label: 'English', flag: 'EN' },
 ];
 
 const placeholderPhrases = [
@@ -35,7 +34,7 @@ const placeholderPhrases = [
 
 const recentSearches = ['Kannada hits', 'Lo-fi focus', 'Arijit Singh', '90s love songs'];
 
-function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout, onToggleSidebar }) {
+function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout }) {
   const [query, setQuery] = useState('');
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
@@ -320,22 +319,20 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
                 </div>
 
                 <div className="app-header__language-list">
-                  {languageOptions
-                    .filter((option, index, list) => list.findIndex((entry) => entry.label === option.label) === index)
-                    .map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={selectedLanguage.label === option.label ? 'active' : ''}
-                        onClick={() => {
-                          onLanguageChange?.(option.value);
-                          setLanguageOpen(false);
-                        }}
-                      >
-                        <span>{option.flag}</span>
-                        <strong>{option.label}</strong>
-                      </button>
-                    ))}
+                  {languageOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={selectedLanguage.label === option.label ? 'active' : ''}
+                      onClick={() => {
+                        onLanguageChange?.(option.value);
+                        setLanguageOpen(false);
+                      }}
+                    >
+                      <span>{option.flag}</span>
+                      <strong>{option.label}</strong>
+                    </button>
+                  ))}
                 </div>
 
                 <div className="app-header__language-note">
