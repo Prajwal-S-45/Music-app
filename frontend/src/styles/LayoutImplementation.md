@@ -1,363 +1,274 @@
 # Layout System Implementation Guide
 
 ## Overview
-A professional music streaming application layout system implementing Spotify-style navigation with desktop 3-column layout and mobile drawer navigation.
+
+This guide documents the current dashboard layout implementation in `DashboardLayout.css`, `AppShell.jsx`, and `Queue.jsx`.
+
+The current implementation uses:
+
+- A desktop 3-column layout above 1200px.
+- A 2-column sidebar + main layout from 1101px through 1200px.
+- A compact drawer layout at 1100px and below.
 
 ## Current Implementation Status
 
-### ✅ Completed Components
+### 1. Desktop 3-Column Layout (>1200px)
 
-#### 1. CSS Variable System
-**File:** `DashboardLayout.css` (lines 1-75)
+`DashboardLayout.css` defines the base dashboard grid as:
+
 ```css
-/* Desktop Variables (≥1100px) */
---sidebar-width: clamp(220px, 18vw, 250px)  /* Responsive sidebar */
---queue-width: 82px                         /* Collapsed queue */
---header-height: 64px
---player-height: 132px
---shell-padding: 16px
---shell-gap: 16px
---content-gap: 18px
-
-/* Responsive Breakpoints */
-@media (max-width: 1099px)  /* Tablet */
-@media (max-width: 959px)   /* Mobile */
-@media (max-width: 639px)   /* Small Mobile */
+.dashboard-shell {
+  grid-template-columns: 240px 1fr 72px;
+  grid-template-rows: 72px 1fr;
+}
 ```
 
-#### 2. Desktop Layout (1100px+)
-- ✅ 3-column flex layout: Sidebar | Main | Queue
-- ✅ Left sidebar: sticky position, height: calc(100vh - padding*2)
-- ✅ Center main-shell: flex: 1, contains header + content
-- ✅ Right queue: collapsible (82px default, 260px on hover)
-- ✅ Bottom player: fixed, z-index: 35
+The three columns are:
 
-#### 3. Mobile Layout (<960px)
-- ✅ Full-width block layout
-- ✅ Sidebar drawer: fixed left, translateX(-110%), z-index: 30
-- ✅ Queue drawer: fixed right, translateX(110%), z-index: 31
-- ✅ Main content: full width with proper padding
-- ✅ Overlay: fixed backdrop for drawer, z-index: 28
-- ✅ Mobile state managed in AppShell (isCompactLayout, isSidebarOpen, isQueueOpen)
+- Sidebar: 240px.
+- Main content: flexible `1fr`.
+- Queue rail: 72px collapsed.
 
-#### 4. Responsive Sidebar
-- ✅ Desktop: sticky positioning, no horizontal scrollbar
-- ✅ Mobile: fixed drawer with smooth translateX animation
-- ✅ Padding-bottom: reserves space for fixed player
-- ✅ Scrollable content with custom scrollbar
+At `max-width: 1400px`, an earlier grid rule uses `240px 1fr 300px`, but the queue component's final desktop width rules still force the queue rail itself to 72px while collapsed.
 
-#### 5. Queue Panel
-- ✅ Desktop: hover-expand animation (82px → 260px)
-- ✅ Framer Motion: smooth width/opacity transitions
-- ✅ Collapsed: image-only thumbnails (centered)
-- ✅ Expanded: full song info with metadata
-- ✅ Mobile: drawer overlay (right side)
+### 2. 2-Column Layout (1101px - 1200px)
 
-#### 6. Fixed Bottom Player
-- ✅ Position: fixed bottom
-- ✅ Width: calc(100vw - padding*2)
-- ✅ Z-index: 35 (always visible)
-- ✅ Proper sizing: 132px desktop, 100px mobile
-- ✅ Glassmorphism: backdrop-filter blur 26px
-- ✅ Content padding-bottom accounts for player height
+At `max-width: 1200px`, the stylesheet switches the dashboard shell to two columns and hides the queue:
 
-#### 7. Header System
-- ✅ Position: sticky top, z-index: 32
-- ✅ Height: responsive (64px → 52px → 48px)
-- ✅ Contains navigation, search, user controls
-- ✅ Mobile: compact layout with hamburger menu
+```css
+@media (max-width: 1200px) {
+  .dashboard-shell {
+    grid-template-columns: 220px 1fr;
+  }
 
-#### 8. Content Area
-- ✅ Scrollable with smooth scroll-behavior
-- ✅ Custom scrollbar: 6px width, rgba(148,163,184,0.3)
-- ✅ Padding-bottom: prevents player overlap
-- ✅ Grid layouts for cards with responsive columns
-
-### 🎨 Animation System
-```javascript
-/* Framer Motion Timings */
-Width transitions:    0.28s ease-in-out     /* Queue expand */
-Opacity changes:      0.22s ease            /* Content reveal */
-Scale transforms:     0.18s ease            /* Hover effects */
-Height changes:       0.26s ease            /* Content height */
+  .dashboard-queue {
+    display: none;
+  }
+}
 ```
 
-### 📊 Z-Index Hierarchy
-```
-55 ├─ Modal Dialogs
-50 ├─ Search Dropdown
-40 ├─ Context Menus
-35 ├─ Player Bar (fixed bottom)
-32 ├─ Header (sticky top)
-30 ├─ Sidebar Panel (sticky/fixed)
-31 ├─ Queue Panel (fixed drawer mobile)
-28 ├─ Mobile Overlay
-25 └─ Base Layer
+There is also a later `max-width: 1199px` queue hide rule. The effective behavior is that the queue rail is available only above 1200px.
+
+### 3. Compact Drawer Layout (<=1100px)
+
+`AppShell.jsx` sets compact mode with:
+
+```js
+const compact = window.innerWidth <= 1100;
 ```
 
-### 🎯 Responsive Breakpoints
+At the same breakpoint, `DashboardLayout.css` changes to block layout and turns sidebar/queue into drawers:
+
+```css
+@media (max-width: 1100px) {
+  .dashboard-shell {
+    display: block;
+    width: 100%;
+    max-width: none;
+    padding: 0 12px 12px;
+  }
+
+  .dashboard-sidebar {
+    position: fixed;
+    width: min(280px, calc(100vw - 24px));
+    transform: translateX(-112%);
+  }
+
+  .dashboard-queue {
+    position: fixed;
+    width: min(360px, calc(100vw - 24px));
+    top: 76px;
+    right: 12px;
+    bottom: 86px;
+    transform: translateX(116%);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 35;
+  }
+}
 ```
-Desktop:    ≥ 1100px   (3-column layout, full features)
-Tablet:     960-1099px (sidebar visible, queue hidden)
-Mobile:     < 960px    (full-width, drawer nav)
-Small Mob:  < 640px    (ultra-compact spacing)
+
+### 4. Queue Panel Widths
+
+The final queue desktop rules in `DashboardLayout.css` define a 72px collapsed rail and the active hover/edit expansion model.
+
+```css
+.dashboard-queue.desktop {
+  width: 72px !important;
+  min-width: 72px !important;
+}
+
+.dashboard-queue.desktop:hover,
+.dashboard-queue.desktop.hovered,
+.dashboard-queue.desktop.editing {
+  width: clamp(400px, 30vw, 480px) !important;
+}
+
+.dashboard-queue.desktop.editing {
+  width: clamp(440px, 32vw, 520px) !important;
+}
 ```
 
-## File Structure
+Breakpoint-specific queue widths:
 
-### Core Layout Files
-1. **DashboardLayout.css** (4400+ lines)
-   - Root variables and color system
-   - Dashboard shell and main structure
-   - Sidebar, header, content, queue styles
-   - Player bar styling
-   - Animation keyframes
-   - Desktop media queries
-   - Mobile media queries
+- `min-width: 1700px`: hover `clamp(440px, 27vw, 520px)`, edit `clamp(480px, 30vw, 560px)`.
+- `max-width: 1400px`: hover `clamp(360px, 30vw, 430px)`, edit `clamp(410px, 34vw, 470px)`.
+- `max-width: 1200px`: queue hidden.
+- `max-width: 1100px`: queue is a fixed drawer when compact mode opens it.
 
-2. **MobileOptimization.css** (600+ lines)
-   - Mobile-specific CSS variables
-   - Sidebar drawer animations
-   - Queue drawer animations
-   - Mobile grid adjustments
-   - Compact player layout
-   - Touch optimizations
+`Queue.jsx` also animates the desktop width:
 
-3. **LayoutArchitecture.md** (documentation)
-   - Visual layout diagrams
-   - CSS variable reference
-   - Z-index hierarchy
-   - Animation timings
-   - Testing checklist
+```js
+width: isCompactLayout ? 'auto' : isHovered || isEditMode ? 'clamp(400px, 30vw, 500px)' : '72px'
+```
 
-### Component Files Using Layout
-1. **AppShell.jsx** - Root layout container
-   - State: isCompactLayout, isSidebarOpen, isQueueOpen
-   - Manages layout switching at 1100px breakpoint
-   - Routes all child components
+The CSS final pass constrains the rendered hover width to the stylesheet's current clamp values.
 
-2. **Sidebar.jsx** - Left navigation
-   - Browse section (Sparkles, TrendingUp, etc.)
-   - Library section (History, Heart, Album, etc.)
-   - Create Playlist button
-   - Framer Motion entry animations
+### 5. Fixed Bottom Player
 
-3. **Header.jsx** - Top navigation bar
-   - Search input
-   - User controls
-   - Logout button
-   - Mobile hamburger menu
+The player is fixed at the bottom. The current `.player-bar` implementation uses:
 
-4. **Queue.jsx** - Right queue panel
-   - Framer Motion hover-expand
-   - Album artwork grid (desktop)
-   - Full song info when expanded
-   - Edit/drag-reorder mode
+```css
+.player-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 96px;
+  z-index: 200;
+}
+```
 
-5. **PlayerBar.jsx** - Bottom music player
-   - Album artwork with glow
-   - Track metadata
-   - Progress slider
-   - Control buttons
-   - Ambient lighting effects
+The main layout reserves vertical space through later shell height rules, including:
+
+```css
+.dashboard-sidebar,
+.dashboard-main-shell,
+.dashboard-queue {
+  height: calc(100vh - 164px);
+  max-height: calc(100vh - 164px);
+}
+```
+
+## Responsive Breakpoints
+
+```text
+>1200px       Desktop 3-column layout with queue rail
+1101-1200px   2-column layout, queue hidden
+<=1100px      Compact drawer layout controlled by AppShell
+<=768px       Additional mobile single-column refinements
+<=760px       Header/mobile tab refinements
+<=640px       Small mobile spacing/card refinements
+```
 
 ## Layout Calculations
 
-### Sidebar (Desktop)
-```
-max-height: calc(100vh - var(--shell-padding) * 2)
-padding-bottom: calc(var(--player-height) + var(--shell-gap) + 20px)
-width: clamp(220px, 18vw, 250px)
+### Sidebar
+
+```text
+Desktop column: 240px
+2-column range: 220px
+Compact drawer: min(280px, calc(100vw - 24px))
 ```
 
-### Content (Desktop)
-```
-flex: 1 1 auto
-min-width: 0
-min-height: 0
-scroll padding-bottom: calc(var(--player-height) + var(--shell-padding) + 8px)
+### Content
+
+```text
+Desktop shell: 240px 1fr 72px
+2-column shell: 220px 1fr
+Compact shell: block layout, full-width main content
 ```
 
-### Queue (Desktop)
-```
-width: 82px (default), animates to 260px on hover
-height: calc(100vh - header - player - padding - gap)
-Framer Motion handles width transitions
-```
+### Queue
 
-### Player (All Layouts)
-```
-position: fixed
-bottom: var(--shell-padding)
-left: var(--shell-padding)
-right: var(--shell-padding)
-width: calc(100vw - calc(var(--shell-padding) * 2))
-height: var(--player-height)
-z-index: 35
+```text
+Collapsed desktop rail: 72px
+Desktop hover/open: clamp(400px, 30vw, 480px)
+Desktop edit: clamp(440px, 32vw, 520px)
+Wide desktop hover/edit: clamp(440px, 27vw, 520px) / clamp(480px, 30vw, 560px)
+Narrow desktop hover/edit: clamp(360px, 30vw, 430px) / clamp(410px, 34vw, 470px)
+2-column range: hidden
+Compact drawer: min(360px, calc(100vw - 24px))
 ```
 
 ## Mobile Drawer System
 
-### Sidebar Drawer (<960px)
+### Sidebar Drawer (<=1100px)
+
 ```css
 .dashboard-sidebar {
   position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 260px;
-  transform: translateX(-110%);  /* Hidden by default */
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 30;
+  left: 12px;
+  top: 12px;
+  bottom: 12px;
+  width: min(280px, calc(100vw - 24px));
+  transform: translateX(-112%);
+  transition: transform 0.28s ease;
+  z-index: 26;
 }
 
+.dashboard-sidebar.open,
 .dashboard-shell.sidebar-open .dashboard-sidebar {
-  transform: translateX(0);  /* Visible when open */
+  transform: translateX(0);
 }
 ```
 
-### Queue Drawer (<960px)
+### Queue Drawer (<=1100px)
+
 ```css
 .dashboard-queue {
   position: fixed;
-  top: var(--header-height);
-  right: 0;
-  transform: translateX(110%);  /* Hidden by default */
+  width: min(360px, calc(100vw - 24px));
+  top: 76px;
+  right: 12px;
+  bottom: 86px;
+  transform: translateX(116%);
   opacity: 0;
-  z-index: 31;
+  pointer-events: none;
+  z-index: 35;
 }
 
-.dashboard-shell.queue-open .dashboard-queue {
-  transform: translateX(0);  /* Visible when open */
+.dashboard-shell.queue-open .dashboard-queue,
+.dashboard-queue.mobile.open {
+  transform: translateX(0);
   opacity: 1;
+  pointer-events: auto;
 }
 ```
-
-### Mobile Overlay
-```css
-.dashboard-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 28;
-  background: rgba(15, 23, 42, 0.34);
-  display: none;
-}
-
-.dashboard-shell.sidebar-open .dashboard-overlay {
-  display: block;  /* Show when drawer open */
-}
-```
-
-## Responsive Grid System
-
-### Music Cards
-```css
-/* Desktop */
-grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))
-gap: 18px
-
-/* Tablet */
-grid-template-columns: repeat(auto-fill, minmax(150px, 1fr))
-gap: 16px
-
-/* Mobile */
-grid-template-columns: repeat(auto-fill, minmax(130px, 1fr))
-gap: 12px
-
-/* Small Mobile */
-grid-template-columns: repeat(auto-fill, minmax(110px, 1fr))
-gap: 10px
-```
-
-## Performance Features
-
-- ✅ Hardware-accelerated animations (transform/opacity)
-- ✅ CSS Grid + Flexbox for efficient layout
-- ✅ Custom scrollbars (lightweight)
-- ✅ Backdrop-filter blur (modern browsers)
-- ✅ Sticky positioning (native, performant)
-- ✅ Min/max-width constraints (prevent overflow)
-- ✅ Minimal repaints/reflows
-
-## Browser Support
-
-- ✅ Chrome/Edge (latest)
-- ✅ Firefox (latest)
-- ✅ Safari (latest)
-- ⚠️ IE 11 (no support - uses modern CSS)
 
 ## Testing Checklist
 
-### Desktop Layout (≥1100px)
-- [ ] Sidebar visible, sticky, scrollable
-- [ ] Queue shows thumbnails (82px)
-- [ ] Queue expands on hover (260px)
-- [ ] Main content scrolls independently
-- [ ] Header sticky at top
-- [ ] Player fixed at bottom, not overlapping
-- [ ] Sidebar padding-bottom prevents player overlap
-- [ ] All animations smooth (0.28s, 0.22s, 0.18s)
+### Desktop 3-Column Layout (>1200px)
 
-### Tablet Layout (960-1099px)
-- [ ] Sidebar visible (drawer optional)
-- [ ] Queue hidden (accessed via menu)
-- [ ] Header compact (56px)
-- [ ] Player smaller (120px)
-- [ ] Content properly sized
-- [ ] All responsive
+- [ ] Sidebar visible in the 240px column.
+- [ ] Queue rail is visible at 72px while collapsed.
+- [ ] Queue expands to the active hover clamp.
+- [ ] Queue edit mode uses the wider edit clamp.
+- [ ] Player remains fixed at the bottom.
 
-### Mobile Layout (<960px)
-- [ ] Full-width content
-- [ ] Sidebar drawer works (toggle opens/closes)
-- [ ] Queue drawer works
-- [ ] Overlay backdrop visible when drawer open
-- [ ] Header compact (52px)
-- [ ] Player compact (100px)
-- [ ] Cards in 2-3 columns
-- [ ] Touch targets ≥44px
-- [ ] Smooth drawer animations (0.3s)
+### 2-Column Layout (1101px - 1200px)
 
-### Small Mobile (<640px)
-- [ ] Ultra-compact spacing
-- [ ] Cards 2 columns (110px)
-- [ ] Header 48px
-- [ ] Player 96px
-- [ ] All elements visible
-- [ ] No horizontal scrolling
+- [ ] Shell uses sidebar + main content.
+- [ ] Queue is hidden.
+- [ ] Main content fills the remaining width.
 
-## Key Improvements Over Previous Version
+### Compact Drawer Layout (<=1100px)
 
-1. **Professional Architecture**
-   - Clear separation of desktop vs mobile layouts
-   - Documented CSS variable system
-   - Consistent animation timings
+- [ ] AppShell sets compact mode.
+- [ ] Sidebar opens as a left drawer.
+- [ ] Queue opens as a right drawer.
+- [ ] Main content remains full width.
+- [ ] Drawer transitions and overlay behavior work.
 
-2. **Better Spacing**
-   - Reserved space system prevents overlaps
-   - Consistent gap/padding hierarchy
-   - Responsive padding-bottom for content
+### Small Mobile
 
-3. **Enhanced Mobile**
-   - Drawer navigation system
-   - Touch-friendly buttons
-   - Proper z-index layering
-   - Smooth transitions
+- [ ] Refinements hold at 768px, 760px, and 640px.
+- [ ] No horizontal scrolling.
+- [ ] Touch targets remain usable.
 
-4. **Premium Interactions**
-   - Queue hover-expand (Framer Motion)
-   - Smooth sidebar drawer
-   - Glassmorphism effects
-   - Custom scrollbars
+## Related Files
 
-5. **Accessibility**
-   - Sticky header remains accessible
-   - Proper ARIA labels
-   - Keyboard navigation
-   - Focus management
-
-## Related Documentation
-
-- **LayoutArchitecture.md** - Visual diagrams and detailed specs
-- **DashboardLayout.css** - Complete implementation
-- **MobileOptimization.css** - Mobile-specific styles
-- **AppShell.jsx** - Layout state management
+- `DashboardLayout.css` - Complete layout implementation.
+- `LayoutArchitecture.md` - High-level layout architecture and breakpoint reference.
+- `AppShell.jsx` - Compact layout state management.
+- `Queue.jsx` - Queue hover/edit state and motion width animation.
