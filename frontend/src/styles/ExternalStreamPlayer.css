@@ -52,13 +52,13 @@
   font-size: 14px;
 }
 
-.controls {
+.external-stream-player .controls {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.controls button {
+.external-stream-player .controls button {
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 999px;
   padding: 8px 14px;
@@ -71,18 +71,24 @@
     border-color 0.2s ease;
 }
 
-.controls button:hover {
+.external-stream-player .controls button:hover {
   transform: translateY(-1px);
   border-color: rgba(52, 211, 153, 0.28);
   background: rgba(15, 23, 42, 0.9);
 }
 
-.state-msg {
+.external-stream-player .controls button:focus-visible {
+  outline: 2px solid rgba(16, 185, 129, 0.6);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.16);
+}
+
+.external-stream-player .state-msg {
   margin: 10px 0 0;
   color: rgba(203, 213, 225, 0.9);
   font-size: 14px;
 }
 
-.state-msg.error {
+.external-stream-player .state-msg.error {
   color: #fda4af;
 }
