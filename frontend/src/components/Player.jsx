@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import useSocketRoom from '../hooks/useSocketRoom';
 import { buildSongLikePayload } from '../utils/songPayload';
@@ -61,7 +61,7 @@ const getVideoIdFromUrl = (value) => {
     if (parsed.hostname.includes('youtube.com')) {
       return (parsed.searchParams.get('v') || '').trim();
     }
-  } catch (error) {
+  } catch {
     return '';
   }
 
@@ -347,7 +347,7 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
           if (nextSongs.length > 0) {
             break;
           }
-        } catch (requestError) {
+        } catch {
           // Try next endpoint.
         }
       }
@@ -394,7 +394,7 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
     const applyTime = () => {
       try {
         audio.currentTime = safeTime;
-      } catch (error) {
+      } catch {
         // Ignore seek failures until metadata is ready.
       }
     };
@@ -519,7 +519,7 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
         } else if (audioRef.current) {
           try {
             audioRef.current.currentTime = safeTime;
-          } catch (error) {
+          } catch {
             // Wait for metadata if needed.
           }
         }
@@ -665,7 +665,7 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
           currentTime: getCurrentPlaybackTime(),
         });
       }
-    } catch (error) {
+    } catch {
       setMessage('Unable to resume playback.');
     }
   };
@@ -753,7 +753,7 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
       }
 
       setMessage(`Room ID copied: ${joinedRoomId}`);
-    } catch (error) {
+    } catch {
       setMessage('Could not copy room ID. Please copy it manually.');
     }
   };
