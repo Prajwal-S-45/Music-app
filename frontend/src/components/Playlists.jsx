@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { deleteSavedQueue, getSavedQueues, renameSavedQueue } from '../utils/savedQueues';
 import ArtistsPage from './ArtistsPage';
