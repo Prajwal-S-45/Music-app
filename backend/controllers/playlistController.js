@@ -8,7 +8,7 @@ const mapFallbackVideo = (videoId) => ({
   thumbnail: null,
   channelTitle: 'Unknown Channel',
   source: 'youtube',
-  playable: true,
+  playable: false,
 });
 
 exports.createPlaylist = async (req, res) => {
@@ -108,6 +108,18 @@ exports.getPlaylistSongs = async (req, res) => {
       detailedSongs = await youtubeService.getVideosByIds(videoIds);
     } catch (error) {
       console.warn('Could not fetch full YouTube metadata for playlist songs:', error.message);
+      detailedSongs = [];
+
+      for (const videoId of videoIds) {
+        try {
+          const [song] = await youtubeService.getVideosByIds([videoId]);
+          if (song) {
+            detailedSongs.push(song);
+          }
+        } catch (singleError) {
+          console.warn(`Could not fetch YouTube metadata for playlist song ${videoId}:`, singleError.message);
+        }
+      }
     }
 
     const songsById = new Map(detailedSongs.map((song) => [song.id, song]));
