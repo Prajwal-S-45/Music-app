@@ -27,15 +27,15 @@ const normalizeHistoryPayload = (body = {}) => {
   };
 };
 
-const mapHistoryRow = (row) => {
-  let metadata = null;
-
+const parseHistoryMetadata = (value) => {
   try {
-    metadata = row.metadata ? JSON.parse(row.metadata) : null;
+    return value ? JSON.parse(value) : null;
   } catch {
-    metadata = null;
+    return null;
   }
+};
 
+const mapHistoryRow = (row) => {
   return {
     id: row.id,
     type: row.type,
@@ -43,7 +43,7 @@ const mapHistoryRow = (row) => {
     subtitle: row.subtitle || '',
     image: row.image || '',
     target: row.target || '',
-    metadata,
+    metadata: parseHistoryMetadata(row.metadata),
     timestamp: row.created_at,
   };
 };
