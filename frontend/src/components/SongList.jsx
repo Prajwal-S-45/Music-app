@@ -1,9 +1,9 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { Heart, ListPlus, Play } from 'lucide-react';
 
 const formatDuration = (seconds) => {
-  const value = Number(seconds) || 0;
-  if (!value) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) {
     return '--:--';
   }
 
@@ -12,10 +12,10 @@ const formatDuration = (seconds) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-function SongList({ songs, likedSongIds, onPlayTrack, onQueueTrack, onLikeTrack }) {
+function SongList({ songs = [], likedSongIds = [], onPlayTrack, onQueueTrack, onLikeTrack }) {
   return (
     <div className="divide-y divide-slate-200/60">
-      {songs.map((song, index) => {
+      {songs.map((song) => {
         const liked = likedSongIds.includes(song.id);
 
         return (
