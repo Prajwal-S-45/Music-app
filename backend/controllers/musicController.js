@@ -5,7 +5,7 @@ const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const FAILED_SEARCH_CACHE_TTL_MS = 20 * 1000;
 const TRENDING_CACHE_TTL_MS = 2 * 60 * 1000;
 const MAX_SEARCH_CACHE_ENTRIES = 500;
-const MAX_RESULT_LIMIT = 10;
+const MAX_RESULT_LIMIT = 50;
 const MIN_QUERY_LENGTH = 2;
 const searchCache = new Map();
 const inFlightSearches = new Map();
@@ -32,16 +32,6 @@ const cacheMetrics = {
   },
 };
 
-const mapFallbackVideo = (videoId) => ({
-  id: videoId,
-  videoId,
-  title: 'Unavailable video',
-  thumbnail: null,
-  channelTitle: 'Unknown Channel',
-  source: 'youtube',
-  playable: true,
-});
-
 const mapCatalogSong = (item) => {
   const id = item?.videoId || item?.id;
   return {
@@ -59,6 +49,31 @@ const mapCatalogSong = (item) => {
     playable: Boolean(id),
   };
 };
+
+const normalizeLikedSongSnapshot = (body, normalizedSongId) => ({
+  title: String(body.title || '').trim() || null,
+  artist: String(body.artist || body.channelTitle || '').trim() || null,
+  album: String(body.album || '').trim() || null,
+  thumbnail: String(body.thumbnail || body.cover || body.image || '').trim() || null,
+  duration: Number(body.duration) || null,
+  source: String(body.source || 'youtube').trim() || 'youtube',
+  songId: normalizedSongId,
+});
+
+const mapLikedRow = (row) => ({
+  id: row.song_id,
+  videoId: row.song_id,
+  title: row.title || 'Unavailable video',
+  artist: row.artist || row.channelTitle || 'Unknown Artist',
+  channelTitle: row.artist || row.channelTitle || 'Unknown Artist',
+  album: row.album || '',
+  thumbnail: row.thumbnail || null,
+  cover: row.thumbnail || null,
+  duration: Number(row.duration) || 0,
+  source: row.source || 'youtube',
+  playable: true,
+  likedAt: row.liked_at,
+});
 
 const sendYouTubeError = (res, error, context) => {
   console.error(`Error in ${context}:`, error);
@@ -150,6 +165,11 @@ const getTrendingCache = (key) => {
   return entry.payload;
 };
 
+const getStaleTrendingCache = (key) => {
+  const entry = trendingCache.get(key);
+  return entry?.payload || null;
+};
+
 const getArtistsCache = (key) => {
   const entry = artistsCache.get(key);
   if (!entry) {
@@ -162,6 +182,11 @@ const getArtistsCache = (key) => {
   }
 
   return entry.payload;
+};
+
+const getStaleArtistsCache = (key) => {
+  const entry = artistsCache.get(key);
+  return entry?.payload || null;
 };
 
 const setArtistsCache = (key, payload, ttlMs = SEARCH_CACHE_TTL_MS) => {
@@ -250,11 +275,13 @@ exports.getSongs = async (req, res) => {
 
 exports.getArtists = async (req, res) => {
   const rawQuery = sanitizeSearchInput(req.query.q || req.query.query || '');
+  const rawLanguage = sanitizeSearchInput(req.query.language || '');
   const normalizedQuery = normalizeCacheText(rawQuery);
+  const normalizedLanguage = normalizeCacheText(rawLanguage);
   const pageToken = String(req.query.pageToken || '').trim();
   const parsedLimit = parseInt(req.query.limit, 10);
   const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? MAX_RESULT_LIMIT : parsedLimit, 1), MAX_RESULT_LIMIT);
-  const cacheKey = `artists::${normalizedQuery}::${pageToken}::${limit}`;
+  const cacheKey = `artists-v2::${normalizedQuery}::${normalizedLanguage}::${pageToken}::${limit}`;
 
   const cachedPayload = getArtistsCache(cacheKey);
   if (cachedPayload) {
@@ -265,27 +292,29 @@ exports.getArtists = async (req, res) => {
   }
 
   try {
-    const { artists, nextPageToken } = await youtubeService.getArtists({
+    const { artists, nextPageToken, source, warning } = await youtubeService.getArtists({
       query: rawQuery,
+      language: rawLanguage,
       pageToken,
       limit,
-      musicOnly: true,
     });
 
     const payload = {
       success: true,
-      source: 'youtube',
+      source: source || 'musicbrainz',
       query: rawQuery,
+      language: rawLanguage,
       total: Array.isArray(artists) ? artists.length : 0,
       data: Array.isArray(artists) ? artists : [],
       nextPageToken,
+      ...(warning ? { warning } : {}),
     };
 
     setArtistsCache(cacheKey, payload);
     return res.json(payload);
   } catch (error) {
     console.error('Error in getArtists:', error);
-    const stalePayload = getArtistsCache(cacheKey);
+    const stalePayload = getStaleArtistsCache(cacheKey);
     if (stalePayload) {
       return res.json({
         ...stalePayload,
@@ -297,8 +326,9 @@ exports.getArtists = async (req, res) => {
 
     return res.json({
       success: true,
-      source: 'youtube',
+      source: 'artist-directory',
       query: rawQuery,
+      language: rawLanguage,
       total: 0,
       data: [],
       nextPageToken: '',
@@ -436,7 +466,7 @@ exports.getTrending = async (req, res) => {
   } catch (error) {
     console.error('Error in getTrending:', error);
     cacheMetrics.trending.errors += 1;
-    const stalePayload = getTrendingCache(cacheKey);
+    const stalePayload = getStaleTrendingCache(cacheKey);
     if (stalePayload) {
       cacheMetrics.trending.staleHits += 1;
       return res.json({
@@ -462,6 +492,7 @@ exports.likeSong = async (req, res) => {
   try {
     const { songId, videoId } = req.body;
     const normalizedSongId = String(songId || videoId || '').trim();
+    const snapshot = normalizeLikedSongSnapshot(req.body, normalizedSongId);
     const userId = req.userId;
 
     if (!normalizedSongId) {
@@ -484,7 +515,21 @@ exports.likeSong = async (req, res) => {
         return res.status(400).json({ error: 'Song already liked' });
       }
 
-      await connection.execute('INSERT INTO liked_songs (user_id, song_id) VALUES (?, ?)', [userId, normalizedSongId]);
+      await connection.execute(
+        `INSERT INTO liked_songs
+          (user_id, song_id, title, artist, album, thumbnail, duration, source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          userId,
+          normalizedSongId,
+          snapshot.title,
+          snapshot.artist,
+          snapshot.album,
+          snapshot.thumbnail,
+          snapshot.duration,
+          snapshot.source,
+        ]
+      );
 
       return res.json({
         success: true,
@@ -545,9 +590,13 @@ exports.getLikedSongs = async (req, res) => {
     const connection = await pool.getConnection();
 
     try {
-      const [rows] = await connection.execute('SELECT song_id FROM liked_songs WHERE user_id = ? ORDER BY liked_at DESC', [
-        userId,
-      ]);
+      const [rows] = await connection.execute(
+        `SELECT song_id, title, artist, album, thumbnail, duration, source, liked_at
+         FROM liked_songs
+         WHERE user_id = ?
+         ORDER BY liked_at DESC`,
+        [userId]
+      );
 
       const videoIds = rows.map((row) => row.song_id);
       let detailedSongs = [];
@@ -559,7 +608,24 @@ exports.getLikedSongs = async (req, res) => {
       }
 
       const songsById = new Map(detailedSongs.map((song) => [song.id, song]));
-      const likedSongs = videoIds.map((videoId) => songsById.get(videoId) || mapFallbackVideo(videoId));
+      const likedSongs = rows.map((row) => {
+        const detailedSong = songsById.get(row.song_id);
+        const storedSong = mapLikedRow(row);
+
+        return {
+          ...storedSong,
+          ...detailedSong,
+          id: row.song_id,
+          videoId: row.song_id,
+          title: detailedSong?.title || storedSong.title,
+          artist: detailedSong?.artist || detailedSong?.channelTitle || storedSong.artist,
+          channelTitle: detailedSong?.channelTitle || detailedSong?.artist || storedSong.channelTitle,
+          thumbnail: detailedSong?.thumbnail || storedSong.thumbnail,
+          cover: detailedSong?.thumbnail || storedSong.cover,
+          duration: Number(detailedSong?.duration) || storedSong.duration,
+          likedAt: row.liked_at,
+        };
+      });
 
       return res.json({
         success: true,
