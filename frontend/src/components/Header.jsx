@@ -34,13 +34,14 @@ const placeholderPhrases = [
 
 const recentSearches = ['Kannada hits', 'Lo-fi focus', 'Arijit Singh', '90s love songs'];
 
-function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout }) {
+function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout, onPlayTrack, onLikeTrack, onQueueTrack }) {
   const [query, setQuery] = useState('');
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('Music');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [typedPlaceholder, setTypedPlaceholder] = useState('');
@@ -48,6 +49,8 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
   const avatarToggleRef = useRef(null);
   const languageMenuRef = useRef(null);
   const languageToggleRef = useRef(null);
+  const searchShellRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -66,15 +69,24 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
       ) {
         setLanguageOpen(false);
       }
+
+      if (
+        searchExpanded &&
+        searchShellRef.current && !searchShellRef.current.contains(event.target)
+      ) {
+        setDropdownOpen(false);
+        setSearchFocused(false);
+        setSearchExpanded(false);
+      }
     }
 
-    if (avatarOpen || languageOpen) {
+    if (avatarOpen || languageOpen || searchExpanded) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [avatarOpen, languageOpen]);
+  }, [avatarOpen, languageOpen, searchExpanded]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -157,6 +169,20 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
     onSearchSubmit?.(value);
   };
 
+  const handleDropdownPlay = (song) => {
+    onPlayTrack?.(song);
+    setDropdownOpen(false);
+  };
+
+  const handleDropdownLike = (song) => {
+    onLikeTrack?.(song);
+  };
+
+  const handleDropdownQueue = (song) => {
+    onQueueTrack?.(song);
+    setDropdownOpen(false);
+  };
+
   return (
     <motion.header
       initial={{ opacity: 0, y: -16, scale: 0.985 }}
@@ -214,23 +240,29 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
 
       <div className="app-header__center">
         <motion.div
-          className="app-header__search-shell"
-          animate={{ scale: searchFocused ? 1.018 : 1 }}
-          transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+          ref={searchShellRef}
+          className={`app-header__search-shell ${searchExpanded ? 'expanded' : ''}`}
+          animate={{
+            scale: searchExpanded ? 1.012 : 1,
+            maxWidth: searchExpanded ? 860 : 650,
+          }}
+          transition={{ type: 'spring', stiffness: 320, damping: 30 }}
         >
           <form
-            className={`app-header__searchbar ${searchFocused ? 'focused' : ''}`}
+            className={`app-header__searchbar ${searchFocused ? 'focused' : ''} ${searchExpanded ? 'expanded' : ''}`}
             onSubmit={handleSubmit}
             role="search"
+            onClick={() => searchInputRef.current?.focus()}
           >
             <motion.span
               className="app-header__search-icon"
-              animate={{ rotate: searchFocused ? 8 : 0, scale: searchFocused ? 1.08 : 1 }}
+              animate={{ rotate: searchExpanded ? 10 : 0, scale: searchExpanded ? 1.12 : 1 }}
               transition={{ type: 'spring', stiffness: 280, damping: 18 }}
             >
               <Search size={18} className="search-icon" />
             </motion.span>
             <input
+              ref={searchInputRef}
               type="search"
               placeholder={typedPlaceholder || placeholderPhrases[0]}
               value={query}
@@ -238,19 +270,42 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
                 const nextValue = event.target.value;
                 setQuery(nextValue);
                 setDropdownOpen(true);
+                setSearchExpanded(true);
               }}
               onFocus={() => {
                 setDropdownOpen(true);
                 setSearchFocused(true);
+                setSearchExpanded(true);
               }}
               onBlur={() => {
-                window.setTimeout(() => setSearchFocused(false), 140);
+                window.setTimeout(() => {
+                  setSearchFocused(false);
+                  if (!query.trim()) {
+                    setSearchExpanded(false);
+                  }
+                }, 160);
               }}
             />
+            {searchExpanded && query && (
+              <button
+                type="button"
+                className="app-header__searchbar-clear"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setQuery('');
+                  setDropdownOpen(false);
+                  setSearchExpanded(false);
+                }}
+                aria-label="Clear search"
+              >
+                ✕
+              </button>
+            )}
           </form>
 
           <AnimatePresence>
-            {searchFocused && !query.trim() && (
+            {searchExpanded && searchFocused && !query.trim() && (
               <motion.div
                 className="app-header__recent-searches"
                 initial={{ opacity: 0, y: 12, scale: 0.96 }}
@@ -274,12 +329,22 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
           <SearchDropdown
             isOpen={dropdownOpen && Boolean(query.trim())}
             query={query}
-            onClose={() => setDropdownOpen(false)}
+            onClose={() => {
+              setDropdownOpen(false);
+              setSearchExpanded(false);
+            }}
             onClear={() => {
               setQuery('');
               setDropdownOpen(false);
+              setSearchExpanded(false);
             }}
-            onSearchSelect={handleSearchSelect}
+            onSearchSelect={(result) => {
+              handleSearchSelect(result);
+              setSearchExpanded(false);
+            }}
+            onPlayTrack={handleDropdownPlay}
+            onLikeTrack={handleDropdownLike}
+            onMoreTrack={handleDropdownQueue}
           />
         </motion.div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   BookmarkPlus,
@@ -57,6 +57,7 @@ function Queue({
   const [isHovered, setIsHovered] = useState(false);
   const shouldShowQueueDetails = !isCompactLayout || isExpanded || isHovered || isEditMode;
   const undoTimerRef = useRef(null);
+  const statusTimerRef = useRef(null);
   const menuRef = useRef(null);
   const listRef = useRef(null);
   const itemRefs = useRef(new Map());
@@ -70,9 +71,14 @@ function Queue({
   }`;
 
   const showStatus = (type, message) => {
+    if (statusTimerRef.current) {
+      window.clearTimeout(statusTimerRef.current);
+    }
+
     setSaveStatus({ type, message });
-    window.setTimeout(() => {
+    statusTimerRef.current = window.setTimeout(() => {
       setSaveStatus((prev) => (prev.message === message ? { type: '', message: '' } : prev));
+      statusTimerRef.current = null;
     }, 2600);
   };
 
@@ -80,6 +86,9 @@ function Queue({
     return () => {
       if (undoTimerRef.current) {
         window.clearTimeout(undoTimerRef.current);
+      }
+      if (statusTimerRef.current) {
+        window.clearTimeout(statusTimerRef.current);
       }
     };
   }, []);
@@ -287,8 +296,6 @@ function Queue({
     }
 
     setDragOverIndex(overIndex);
-    onReorderQueue?.(draggedIndex, overIndex);
-    setDraggedIndex(overIndex);
   };
 
   const handleDrop = (event, dropIndex) => {

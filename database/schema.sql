@@ -49,6 +49,12 @@ CREATE TABLE IF NOT EXISTS liked_songs (
   id INT PRIMARY KEY AUTO_INCREMENT,
   user_id INT NOT NULL,
   song_id VARCHAR(64) NOT NULL,
+  title VARCHAR(255),
+  artist VARCHAR(255),
+  album VARCHAR(255),
+  thumbnail VARCHAR(500),
+  duration INT,
+  source VARCHAR(64),
   liked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY unique_user_song (user_id, song_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -74,6 +80,22 @@ CREATE TABLE IF NOT EXISTS listening_room_members (
   PRIMARY KEY (room_id, user_id),
   FOREIGN KEY (room_id) REFERENCES listening_rooms(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- User Activity History
+CREATE TABLE IF NOT EXISTS history_items (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  type ENUM('song', 'search', 'artist', 'album', 'playlist') NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  subtitle VARCHAR(255),
+  image VARCHAR(500),
+  target VARCHAR(500),
+  metadata TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_history_user_created (user_id, created_at),
+  INDEX idx_history_type (type)
 );
 
 -- Sample Songs (Optional)

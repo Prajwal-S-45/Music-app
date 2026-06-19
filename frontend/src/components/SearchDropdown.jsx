@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Clock3, Flame, History, Music4, Search as SearchIcon } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Clock3, Flame, Heart, History, Mic2, MoreVertical, Music4, Play, Search as SearchIcon } from 'lucide-react';
 import apiClient from '../api/client';
+import '../styles/SearchDropdown2.css';
+
 
 let searchDropdownCooldownUntil = 0;
 const MIN_SEARCH_LENGTH = 2;
@@ -17,12 +19,17 @@ const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=400&q=80';
 
 function normalizeSong(song, index) {
+  const id = song?.videoId || song?.id || `${song?.title || 'song'}-${index}`;
+
   return {
-    id: song?.videoId || song?.id || `${song?.title || 'song'}-${index}`,
+    ...song,
+    id,
+    videoId: id,
     title: song?.title || 'Untitled Track',
     artist: song?.channelTitle || song?.artist || 'Unknown Artist',
     album: song?.album || '',
     thumbnail: song?.thumbnail || song?.cover || song?.image || FALLBACK_IMAGE,
+    source: song?.source || 'youtube',
   };
 }
 
@@ -67,7 +74,7 @@ function buildSections(rawItems) {
       query: `${song.album || song.artist} album`,
       type: 'album',
     }),
-    4
+    3
   );
 
   const artists = mapUnique(
@@ -81,10 +88,10 @@ function buildSections(rawItems) {
       query: song.artist,
       type: 'artist',
     }),
-    4
+    3
   );
 
-  const songItems = songs.slice(0, 4).map((song) => ({
+  const songItems = songs.slice(0, 3).map((song) => ({
     ...song,
     subtitle: song.artist,
     query: `${song.title} ${song.artist}`,
@@ -145,42 +152,32 @@ function buildSections(rawItems) {
   };
 }
 
-function Section({ title, items, onSelect, showViewAll, onViewAll, icon: Icon, subtitle }) {
+/* ─── Compact list section ─── */
+function CompactListSection({ title, items, onSelect, showViewAll, onViewAll, icon: Icon, kind = 'square' }) {
   if (!items.length) return null;
 
   return (
-    <section className="dashboard-searchdropdown__section">
-      <div className="dashboard-searchdropdown__section-head">
-        <div className="dashboard-searchdropdown__section-head-left">
-          {Icon && <Icon size={12} />}
-          <div>
-            <h4>{title}</h4>
-            {subtitle && <p>{subtitle}</p>}
-          </div>
-        </div>
+    <section className={`sd2-section sd2-section--${kind}`}>
+      <div className="sd2-section__head">
+        <h4 className="sd2-section__title">{title}</h4>
         {showViewAll && (
-          <button
-            type="button"
-            className="dashboard-searchdropdown__viewall"
-            onClick={onViewAll}
-          >
+          <button type="button" className="sd2-viewall" onClick={onViewAll}>
             View All
           </button>
         )}
       </div>
-
-      <div className="dashboard-searchdropdown__section-list">
-        {items.map((item, index) => (
+      <div className="sd2-section__list">
+        {items.slice(0, 3).map((item) => (
           <button
             key={item.id}
             type="button"
-            className={`dashboard-searchdropdown__section-item ${title === 'Top Result' && index === 0 ? 'dashboard-searchdropdown__section-item--primary' : ''}`}
+            className="sd2-row"
             onClick={() => onSelect(item)}
           >
-            <img src={item.thumbnail} alt={item.title} loading="lazy" />
-            <div className="dashboard-searchdropdown__section-meta">
-              <span className="dashboard-searchdropdown__section-title">{item.title}</span>
-              <span className="dashboard-searchdropdown__section-subtitle">{item.subtitle}</span>
+            <img src={item.thumbnail} alt={item.title} loading="lazy" className="sd2-row__img" />
+            <div className="sd2-row__meta">
+              <span className="sd2-row__name">{item.title}</span>
+              <span className="sd2-row__sub">{item.subtitle}</span>
             </div>
           </button>
         ))}
@@ -189,7 +186,75 @@ function Section({ title, items, onSelect, showViewAll, onViewAll, icon: Icon, s
   );
 }
 
-function SearchDropdown({ isOpen, query, onClose, onSearchSelect }) {
+/* ─── Top Result panel ─── */
+function TopResultPanel({ item, onSelect, onPlay, onLike, onMore }) {
+  if (!item) return null;
+
+  const handleCardKeyDown = (event) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect(item);
+    }
+  };
+
+  const stopProp = (event, cb) => {
+    event.stopPropagation();
+    cb?.(item);
+  };
+
+  return (
+    <section className="sd2-section sd2-section--top">
+      <div className="sd2-section__head">
+        <h4 className="sd2-section__title">Top Result</h4>
+      </div>
+      <div
+        role="button"
+        tabIndex={0}
+        className="sd2-top-card"
+        onClick={() => onSelect(item)}
+        onKeyDown={handleCardKeyDown}
+      >
+        <span className="sd2-top-card__bg" style={{ backgroundImage: `url(${item.thumbnail})` }} />
+        <img src={item.thumbnail} alt={item.title} loading="lazy" className="sd2-top-card__img" />
+        <div className="sd2-top-card__info">
+          <span className="sd2-top-card__label">Song</span>
+          <strong className="sd2-top-card__name">{item.title}</strong>
+          <small className="sd2-top-card__sub">{item.subtitle}</small>
+          <div className="sd2-top-card__actions">
+            <button
+              type="button"
+              className="sd2-action sd2-action--play"
+              onClick={(e) => stopProp(e, onPlay)}
+              aria-label={`Play ${item.title}`}
+            >
+              <Play size={14} fill="currentColor" strokeWidth={0} />
+            </button>
+            <button
+              type="button"
+              className="sd2-action sd2-action--like"
+              onClick={(e) => stopProp(e, onLike)}
+              aria-label={`Like ${item.title}`}
+            >
+              <Heart size={14} />
+            </button>
+            <button
+              type="button"
+              className="sd2-action"
+              onClick={(e) => stopProp(e, onMore)}
+              aria-label={`Queue ${item.title}`}
+            >
+              <MoreVertical size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Main Dropdown ─── */
+function SearchDropdown({ isOpen, query, onClose, onClear, onSearchSelect, onPlayTrack, onLikeTrack, onMoreTrack }) {
   const [rawResults, setRawResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState('');
@@ -363,91 +428,68 @@ function SearchDropdown({ isOpen, query, onClose, onSearchSelect }) {
   const hasBrowseState = !query.trim() && (recentSearches.length > 0 || trendingResults.length > 0);
 
   return (
-    <div ref={dropdownRef} className="dashboard-searchdropdown dashboard-searchdropdown--immersive" role="listbox" aria-label="Search results">
-      <div className="dashboard-searchdropdown__hero">
-        <div>
-          <div className="dashboard-searchdropdown__kicker">
-            <SearchIcon size={12} />
-            <span>Quick search</span>
-          </div>
-          <h3>{query.trim() ? 'Suggestions' : 'Discover music faster'}</h3>
-          <p>{query.trim() ? `Results for “${query.trim()}”` : 'Recent searches and trending picks appear here instantly.'}</p>
-        </div>
-        <div className="dashboard-searchdropdown__hero-chip">
-          <Music4 size={13} />
-          Premium search
-        </div>
-      </div>
-
+    <div ref={dropdownRef} className="sd2" role="listbox" aria-label="Search results">
       {isLoading ? (
-        <div className="dashboard-searchdropdown__loading">
-          <span />
-          <span />
-          <span />
+        <div className="sd2__loading">
+          <span /><span /><span />
         </div>
       ) : (
-        <div className="dashboard-searchdropdown__sections-grid">
+        <div className="sd2__body">
           {query.trim() ? (
-            <>
-              <Section
-                title="Top Result"
-                subtitle="Best match"
-                icon={Flame}
-                items={sections.topResult}
+            <div className="sd2__grid">
+              <TopResultPanel
+                item={sections.topResult[0]}
                 onSelect={selectItem}
-                showViewAll={false}
+                onPlay={onPlayTrack}
+                onLike={onLikeTrack}
+                onMore={onMoreTrack}
               />
-              <Section
+              <CompactListSection
                 title="Albums"
-                subtitle="Collection results"
                 icon={Music4}
                 items={sections.albums}
                 onSelect={selectItem}
                 showViewAll
                 onViewAll={onViewAll}
               />
-              <Section
+              <CompactListSection
                 title="Songs"
-                subtitle="Instant plays"
                 icon={SearchIcon}
                 items={sections.songs}
                 onSelect={selectItem}
                 showViewAll
                 onViewAll={onViewAll}
               />
-              <Section
+              <CompactListSection
                 title="Artists"
-                subtitle="Explore creators"
-                icon={History}
+                icon={Mic2}
+                kind="artist"
                 items={sections.artists}
                 onSelect={selectItem}
                 showViewAll
                 onViewAll={onViewAll}
               />
-              <Section
+              <CompactListSection
                 title="Playlists"
-                subtitle="Curated mixes"
                 icon={Clock3}
                 items={sections.playlists}
                 onSelect={selectItem}
                 showViewAll
                 onViewAll={onViewAll}
               />
-              <Section
+              <CompactListSection
                 title="Podcasts"
-                subtitle="Talk shows"
-                icon={Clock3}
+                icon={History}
                 items={sections.podcasts}
                 onSelect={selectItem}
                 showViewAll
                 onViewAll={onViewAll}
               />
-            </>
+            </div>
           ) : (
-            <>
-              <Section
+            <div className="sd2__grid sd2__grid--browse">
+              <CompactListSection
                 title="Recent Searches"
-                subtitle="Pick up where you left off"
                 icon={History}
                 items={recentSearches.map((item, index) => ({
                   id: `recent-${index}-${item}`,
@@ -460,39 +502,53 @@ function SearchDropdown({ isOpen, query, onClose, onSearchSelect }) {
                 onSelect={selectItem}
                 showViewAll={false}
               />
-              <Section
+              <CompactListSection
+                title="Trending Songs"
+                icon={Flame}
+                items={browseSections.songs}
+                onSelect={selectItem}
+                showViewAll={false}
+              />
+              <CompactListSection
                 title="Trending Now"
-                subtitle="Popular picks"
                 icon={Flame}
                 items={browseSections.topResult}
                 onSelect={selectItem}
                 showViewAll={false}
               />
-              <Section
-                title="Trending Albums"
-                subtitle="Popular collections"
+              <CompactListSection
+                title="Popular Artists"
+                icon={Mic2}
+                kind="artist"
+                items={browseSections.artists}
+                onSelect={selectItem}
+                showViewAll={false}
+              />
+              <CompactListSection
+                title="Albums"
                 icon={Music4}
                 items={browseSections.albums}
                 onSelect={selectItem}
                 showViewAll={false}
               />
-              <Section
-                title="Trending Artists"
-                subtitle="Frequently played"
-                icon={History}
-                items={browseSections.artists}
+              <CompactListSection
+                title="Popular Playlists"
+                icon={Clock3}
+                items={browseSections.playlists}
                 onSelect={selectItem}
                 showViewAll={false}
               />
-            </>
+            </div>
           )}
 
           {!hasAny && (
-            <div className="dashboard-searchdropdown__empty">{noticeMessage || (hasBrowseState ? 'Start typing to search across songs, artists, and albums.' : 'No results found')}</div>
+            <div className="sd2__empty">
+              {noticeMessage || (hasBrowseState ? 'Start typing to search across songs, artists, and albums.' : 'No results found')}
+            </div>
           )}
 
           {hasAny && noticeMessage && (
-            <div className="dashboard-searchdropdown__empty">{noticeMessage}</div>
+            <div className="sd2__empty">{noticeMessage}</div>
           )}
         </div>
       )}

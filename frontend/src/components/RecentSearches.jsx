@@ -1,4 +1,3 @@
-import React from 'react';
 import { Clock3, Sparkles, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -33,7 +32,7 @@ function RecentSearches({ searches = [], onSearch, onClear }) {
       <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {searches.map((search, idx) => (
           <motion.li
-            key={idx}
+            key={search}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, delay: idx * 0.03 }}

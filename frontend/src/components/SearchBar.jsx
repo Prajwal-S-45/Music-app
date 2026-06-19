@@ -1,5 +1,5 @@
-import React, { memo, useEffect, useMemo, useState } from 'react';
-import { Search as SearchIcon, Sparkles, TrendingUp } from 'lucide-react';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { Search as SearchIcon, TrendingUp, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const PLACEHOLDER_LINES = [
@@ -8,7 +8,7 @@ const PLACEHOLDER_LINES = [
   'Find your next favorite track',
 ];
 
-function SearchBar({ query, onInputChange, onSubmit, suggestions = [], onSuggestionSelect }) {
+function SearchBar({ query, onInputChange, onSubmit, onClear, suggestions = [], onSuggestionSelect }) {
   const [focused, setFocused] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
@@ -44,11 +44,11 @@ function SearchBar({ query, onInputChange, onSubmit, suggestions = [], onSuggest
       initial={{ y: -14, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="search-sticky-bar sticky top-0 z-40 px-4 pt-3 md:px-6"
+      className="search-sticky-bar fixed left-0 right-0 top-0 z-40 px-4 py-3 md:px-6"
     >
-      <div className="mx-auto w-full max-w-[1024px]">
+      <div className="mx-auto w-full max-w-[1100px]">
         <form onSubmit={onSubmit} role="search" className="relative">
-          <label className={`search-input-shell group flex items-center gap-3 px-4 py-3 md:px-5 ${focused ? 'search-input-shell--focused' : ''}`}>
+          <label className={`search-input-shell group flex items-center gap-3 px-4 py-3.5 md:px-5 ${focused ? 'search-input-shell--focused' : ''}`}>
             <span className="search-input-shell__icon">
               <SearchIcon className="h-5 w-5" />
             </span>
@@ -65,10 +65,22 @@ function SearchBar({ query, onInputChange, onSubmit, suggestions = [], onSuggest
               className="search-input-shell__input w-full border-none bg-transparent outline-none"
             />
 
-            <span className="search-input-shell__chip hidden items-center gap-1 rounded-full border border-white/15 bg-white/8 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300 md:inline-flex">
-              <Sparkles size={11} className="text-emerald-300" />
-              Premium search
-            </span>
+            <AnimatePresence>
+              {query ? (
+                <motion.button
+                  type="button"
+                  initial={{ opacity: 0, scale: 0.86 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.86 }}
+                  className="search-input-shell__clear"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={onClear}
+                  aria-label="Clear search"
+                >
+                  <X size={18} />
+                </motion.button>
+              ) : null}
+            </AnimatePresence>
           </label>
 
           <AnimatePresence>
