@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Route, Routes } from 'react-router-dom';
 import AppShell from './components/AppShell';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
@@ -30,22 +30,21 @@ function App() {
     setToken(null);
     setUser(null);
   };
+
+  const handleUserUpdate = (updatedUser) => {
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
   return (
-    <BrowserRouter
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
-      <Routes>
-        <Route path="/login" element={<LoginPage user={user} token={token} onLogin={handleLogin} />} />
-        <Route path="/register" element={<RegisterPage user={user} token={token} onLogin={handleLogin} />} />
-        <Route
-          path="*"
-          element={user && token ? <AppShell user={user} token={token} onLogout={handleLogout} /> : <HomePage />}
-        />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/login" element={<LoginPage user={user} token={token} onLogin={handleLogin} />} />
+      <Route path="/register" element={<RegisterPage user={user} token={token} onLogin={handleLogin} />} />
+      <Route
+        path="*"
+        element={user && token ? <AppShell user={user} token={token} onLogout={handleLogout} onUserUpdate={handleUserUpdate} /> : <HomePage />}
+      />
+    </Routes>
   );
 }
 
