@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { Play } from 'lucide-react';
 
 const FALLBACK_IMAGE =
