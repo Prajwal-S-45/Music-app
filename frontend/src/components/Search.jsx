@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import apiClient from '../api/client';
 import SearchBar from './SearchBar';
 import SearchResults from './SearchResults';
-import RecentSearches from './RecentSearches';
+import SearchHero from './SearchHero';
+import { buildSongLikePayload } from '../utils/songPayload';
 import '../styles/Search.css';
 
 const FALLBACK_IMAGE =
@@ -19,7 +20,7 @@ const sanitizeQuery = (value) => {
     .trim();
 };
 
-function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
+function Search({ token, activeTrackId, onPlayTrack, onQueueTrack, onLikeUpdate, onHistoryRecord }) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [searchType, setSearchType] = useState('song');
@@ -104,7 +105,7 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
     if (nextType !== searchType) {
       setSearchType(nextType);
     }
-  }, [location.search, query, searchType]);
+  }, [location.search]);
 
   useEffect(() => {
     const sanitized = sanitizeQuery(query);
@@ -173,7 +174,7 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
         id: song.videoId || song.id,
         videoId: song.videoId || song.id,
         title: song.title || 'Untitled Track',
-        artist: song.channelTitle || song.artist || 'Unknown Channel',
+        artist: song.artist || song.channelTitle || 'Unknown Channel',
         album: song.album || null,
         cover: song.thumbnail || song.cover || song.image || FALLBACK_IMAGE,
         duration: Number(song.duration) || 0,
@@ -184,8 +185,15 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
       setResults(nextResults);
       setSearched(true);
       setStatus('');
-      setWarningMessage(String(response.data?.warning || '').trim());
+      setWarningMessage(nextResults.length === 0 ? String(response.data?.warning || '').trim() : '');
       saveRecentSearch(trimmed);
+      onHistoryRecord?.({
+        type: 'search',
+        title: trimmed,
+        subtitle: 'Search query',
+        target: `/search?q=${encodeURIComponent(trimmed)}&type=${encodeURIComponent(normalizedType)}`,
+        metadata: { query: trimmed, type: normalizedType },
+      });
     } catch (error) {
       console.error('Error searching:', error);
       setResults([]);
@@ -199,7 +207,7 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
     } finally {
       setIsLoading(false);
     }
-  }, [saveRecentSearch]);
+  }, [onHistoryRecord, saveRecentSearch]);
 
   useEffect(() => {
     const runDebouncedSearch = async () => {
@@ -262,6 +270,17 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
     }
   }, [navigate]);
 
+  const handleClearSearch = useCallback(() => {
+    setQuery('');
+    setDebouncedQuery('');
+    setResults([]);
+    setSearched(false);
+    setErrorMessage('');
+    setWarningMessage('');
+    lastRequestKeyRef.current = '';
+    navigate('/search', { replace: true });
+  }, [navigate]);
+
   const playTrack = useCallback((song) => {
     onPlayTrack?.(song);
     setStatus(`Playing ${song.title}`);
@@ -276,7 +295,7 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
     try {
       await apiClient.post(
         '/api/music/like',
-        { songId: song.id },
+        buildSongLikePayload(song),
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -403,64 +422,13 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
     navigate(`/search?q=${encodeURIComponent(nextTerm)}&type=song`, { replace: true });
   }, [navigate]);
 
-  const querySummary = useMemo(() => {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      return 'Search songs, albums, and artists with a premium streaming-style experience.';
-    }
-
-    const typeLabel = {
-      song: 'songs',
-      artist: 'artists',
-      album: 'albums',
-    }[searchType] || 'music';
-
-    return `Showing ${typeLabel} for “${trimmed}”`;
-  }, [query, searchType]);
-
-  const resultCount = groupedResults.songs.length + groupedResults.albums.length + groupedResults.artists.length;
 
   return (
     <div className="search-page-shell min-h-screen text-slate-100">
       <div className="search-page-shell__glow search-page-shell__glow--left" />
       <div className="search-page-shell__glow search-page-shell__glow--right" />
 
-      <SearchBar
-        query={query}
-        onInputChange={handleInputChange}
-        onSubmit={handleSearch}
-        suggestions={recentSearches}
-        onSuggestionSelect={handleRecentSearchClick}
-      />
-
-      <div className="search-page-shell__content mx-auto w-full max-w-7xl px-4 pb-10 pt-5 md:px-6 md:pb-12 md:pt-6">
-        <motion.section
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: 'easeOut' }}
-          className="search-hero-panel mb-6"
-        >
-          <div className="search-hero-panel__copy">
-            <p className="search-hero-panel__eyebrow">Search</p>
-            <h1>{query.trim() ? `Results for ${query.trim()}` : 'Discover music instantly'}</h1>
-            <p>{querySummary}</p>
-          </div>
-
-          <div className="search-hero-panel__stats">
-            <div>
-              <span>Results</span>
-              <strong>{resultCount}</strong>
-            </div>
-            <div>
-              <span>Recent</span>
-              <strong>{recentSearches.length}</strong>
-            </div>
-            <div>
-              <span>Type</span>
-              <strong>{searchType}</strong>
-            </div>
-          </div>
-        </motion.section>
+      <div className="search-page-shell__content mx-auto w-full max-w-7xl pb-24 pt-20 px-4 md:px-8 md:pb-10 md:pt-28">
 
         <AnimatePresence mode="wait">
           <motion.div
@@ -471,28 +439,23 @@ function Search({ token, onPlayTrack, onQueueTrack, onLikeUpdate }) {
             transition={{ duration: 0.24, ease: 'easeOut' }}
             className="search-page-shell__surface"
           >
-            {!searched && query.trim() === '' ? (
-              <RecentSearches
-                searches={recentSearches}
-                onSearch={handleRecentSearchClick}
-                onClear={clearRecentSearch}
-              />
-            ) : (
-              <SearchResults
-                query={query.trim()}
-                isLoading={isLoading}
-                searched={searched}
-                errorMessage={errorMessage}
-                warningMessage={warningMessage}
-                hasAnyResults={Boolean(hasAnyResults)}
-                groupedResults={groupedResults}
-                likedSongIds={likedSongIds}
-                onPlayTrack={playTrack}
-                onQueueTrack={queueTrack}
-                onLikeTrack={likeTrack}
-                onCollectionActivate={handleSectionSearch}
-              />
-            )}
+            <SearchResults
+              query={query.trim()}
+              activeTrackId={activeTrackId}
+              isLoading={isLoading}
+              searched={searched}
+              errorMessage={errorMessage}
+              warningMessage={warningMessage}
+              hasAnyResults={Boolean(hasAnyResults)}
+              groupedResults={groupedResults}
+              likedSongIds={likedSongIds}
+              recentSearches={recentSearches}
+              onPlayTrack={playTrack}
+              onQueueTrack={queueTrack}
+              onLikeTrack={likeTrack}
+              onCollectionActivate={handleSectionSearch}
+              onClearRecentSearch={clearRecentSearch}
+            />
           </motion.div>
         </AnimatePresence>
 
