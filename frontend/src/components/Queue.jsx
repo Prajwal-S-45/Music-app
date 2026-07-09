@@ -6,7 +6,7 @@ import {
   ChevronLeft,
   ChevronUp,
   GripVertical,
-  ListMusic,
+  LayoutList,
   MoreHorizontalIcon,
   Music2,
   Play,
@@ -54,8 +54,6 @@ function Queue({
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [selectedQueueItems, setSelectedQueueItems] = useState([]);
   const [dragOverIndex, setDragOverIndex] = useState(null);
-  const [isHovered, setIsHovered] = useState(false);
-  const shouldShowQueueDetails = !isCompactLayout || isExpanded || isHovered || isEditMode;
   const undoTimerRef = useRef(null);
   const statusTimerRef = useRef(null);
   const menuRef = useRef(null);
@@ -66,15 +64,11 @@ function Queue({
     () => items.reduce((total, item) => total + (Number(item?.duration) || 0), 0),
     [items]
   );
-  const queueSummary = `${items.length} ${items.length === 1 ? 'song' : 'songs'}${
-    queueDuration > 0 ? ` - ${formatQueueDuration(queueDuration)}` : ''
-  }`;
 
   const showStatus = (type, message) => {
     if (statusTimerRef.current) {
       window.clearTimeout(statusTimerRef.current);
     }
-
     setSaveStatus({ type, message });
     statusTimerRef.current = window.setTimeout(() => {
       setSaveStatus((prev) => (prev.message === message ? { type: '', message: '' } : prev));
@@ -84,12 +78,8 @@ function Queue({
 
   useEffect(() => {
     return () => {
-      if (undoTimerRef.current) {
-        window.clearTimeout(undoTimerRef.current);
-      }
-      if (statusTimerRef.current) {
-        window.clearTimeout(statusTimerRef.current);
-      }
+      if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+      if (statusTimerRef.current) window.clearTimeout(statusTimerRef.current);
     };
   }, []);
 
@@ -99,16 +89,11 @@ function Queue({
         setIsMenuOpen(false);
       }
     };
-
     const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        setIsMenuOpen(false);
-      }
+      if (event.key === 'Escape') setIsMenuOpen(false);
     };
-
     window.addEventListener('mousedown', handlePointerDown);
     window.addEventListener('keydown', handleEscape);
-
     return () => {
       window.removeEventListener('mousedown', handlePointerDown);
       window.removeEventListener('keydown', handleEscape);
@@ -121,67 +106,38 @@ function Queue({
   );
 
   const scrollToNowPlaying = () => {
-    if (!listRef.current || activeTrackId == null) {
-      return false;
-    }
-
+    if (!listRef.current || activeTrackId == null) return false;
     const activeElement = itemRefs.current.get(activeTrackId);
-    if (!activeElement) {
-      return false;
-    }
-
+    if (!activeElement) return false;
     const listElement = listRef.current;
     const targetTop = Math.max(
       0,
       activeElement.offsetTop - listElement.clientHeight / 2 + activeElement.clientHeight / 2
     );
-
     listElement.scrollTo({ top: targetTop, behavior: 'smooth' });
     return true;
   };
 
   useEffect(() => {
-    if (activeTrackId) {
-      scrollToNowPlaying();
-    }
+    if (activeTrackId) scrollToNowPlaying();
   }, [activeTrackId, items]);
 
   const handleSaveQueue = async (event) => {
     event.stopPropagation();
-
-    if (isSaving) {
-      return;
-    }
-
+    if (isSaving) return;
     const uniqueQueue = items.filter((song, index, list) => {
-      if (!song?.id) {
-        return false;
-      }
+      if (!song?.id) return false;
       return list.findIndex((entry) => entry?.id === song.id) === index;
     });
-
-    if (uniqueQueue.length === 0) {
-      showStatus('error', 'Queue is empty');
-      return;
-    }
-
+    if (uniqueQueue.length === 0) { showStatus('error', 'Queue is empty'); return; }
     const suggestedName = 'Saved Queue';
     const customName = window.prompt('Enter playlist name', suggestedName);
-    if (customName === null) {
-      return;
-    }
-
+    if (customName === null) return;
     const playlistName = customName.trim() || suggestedName;
-
     try {
       setIsSaving(true);
       setSaveStatus({ type: '', message: '' });
-
-      saveQueueToLibrary({
-        name: playlistName,
-        songs: uniqueQueue,
-      });
-
+      saveQueueToLibrary({ name: playlistName, songs: uniqueQueue });
       showStatus('success', 'Queue saved to Library');
     } catch (error) {
       showStatus('error', error?.message || 'Failed to save queue');
@@ -193,50 +149,31 @@ function Queue({
   const handleClearClick = (event) => {
     event.stopPropagation();
     setIsMenuOpen(false);
-
-    if (items.length === 0) {
-      showStatus('error', 'Queue is already empty');
-      return;
-    }
-
+    if (items.length === 0) { showStatus('error', 'Queue is already empty'); return; }
     setIsClearModalOpen(true);
   };
 
   const handleConfirmClear = () => {
     setIsClearModalOpen(false);
-
     const snapshot = items.slice();
     onClearQueue?.();
-
     setUndoState({ visible: true, items: snapshot });
-
-    if (undoTimerRef.current) {
-      window.clearTimeout(undoTimerRef.current);
-    }
-
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
     undoTimerRef.current = window.setTimeout(() => {
       setUndoState({ visible: false, items: [] });
     }, 5000);
   };
 
   const handleUndoClear = () => {
-    if (undoTimerRef.current) {
-      window.clearTimeout(undoTimerRef.current);
-    }
-
-    if (undoState.items.length > 0) {
-      onRestoreQueue?.(undoState.items);
-    }
-
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    if (undoState.items.length > 0) onRestoreQueue?.(undoState.items);
     setUndoState({ visible: false, items: [] });
   };
 
   const handleFindNowPlaying = () => {
     setIsMenuOpen(false);
-
     if (activeIndex < 0 || !scrollToNowPlaying()) {
       showStatus('error', 'Now playing track is not in queue');
-      return;
     }
   };
 
@@ -246,67 +183,22 @@ function Queue({
     setIsMenuOpen((value) => !value);
   };
 
-  const handleEditQueuePointerDown = (event) => {
-    if (event.pointerType === 'mouse' || event.pointerType === 'touch') {
-      event.preventDefault();
-      event.stopPropagation();
-      handleEditQueue();
-    }
-  };
-
-  const handleEditQueueClick = (event) => {
-    event.stopPropagation();
-    if (event.detail === 0) {
-      handleEditQueue();
-    }
-  };
-
-  const handleFindNowPlayingPointerDown = (event) => {
-    if (event.pointerType === 'mouse' || event.pointerType === 'touch') {
-      event.preventDefault();
-      event.stopPropagation();
-      handleFindNowPlaying();
-    }
-  };
-
-  const handleFindNowPlayingClick = (event) => {
-    event.stopPropagation();
-    if (event.detail === 0) {
-      handleFindNowPlaying();
-    }
-  };
-
   const handleDragStart = (index) => {
-    if (!isEditMode) {
-      return;
-    }
-
+    if (!isEditMode) return;
     setDraggedIndex(index);
   };
 
   const handleDragOver = (event, overIndex) => {
-    if (!isEditMode) {
-      return;
-    }
-
+    if (!isEditMode) return;
     event.preventDefault();
-
-    if (draggedIndex === null || draggedIndex === overIndex) {
-      return;
-    }
-
+    if (draggedIndex === null || draggedIndex === overIndex) return;
     setDragOverIndex(overIndex);
   };
 
   const handleDrop = (event, dropIndex) => {
-    if (!isEditMode || draggedIndex === null) {
-      return;
-    }
-
+    if (!isEditMode || draggedIndex === null) return;
     event.preventDefault();
-    if (draggedIndex !== dropIndex) {
-      onReorderQueue?.(draggedIndex, dropIndex);
-    }
+    if (draggedIndex !== dropIndex) onReorderQueue?.(draggedIndex, dropIndex);
     setDraggedIndex(null);
     setDragOverIndex(null);
   };
@@ -323,11 +215,7 @@ function Queue({
 
   const handleMoveItem = (event, fromIndex, toIndex) => {
     event.stopPropagation();
-
-    if (fromIndex === toIndex || toIndex < 0 || toIndex >= items.length) {
-      return;
-    }
-
+    if (fromIndex === toIndex || toIndex < 0 || toIndex >= items.length) return;
     onReorderQueue?.(fromIndex, toIndex);
   };
 
@@ -339,15 +227,10 @@ function Queue({
     );
   };
 
-  const clearSelection = () => {
-    setSelectedQueueItems([]);
-  };
+  const clearSelection = () => setSelectedQueueItems([]);
 
   const handleBulkRemoveSelected = () => {
-    if (selectedQueueItems.length === 0) {
-      return;
-    }
-
+    if (selectedQueueItems.length === 0) return;
     onRemoveQueueItems?.(selectedQueueItems);
     clearSelection();
   };
@@ -365,45 +248,279 @@ function Queue({
     setIsMenuOpen(false);
   };
 
+  // On desktop: render as permanent "Up Next" panel
+  if (!isCompactLayout) {
+    return (
+      <aside className="upnext-panel" role="complementary" aria-label="Up Next queue">
+        {/* Header */}
+        <div className="upnext-panel__header">
+          <span className="upnext-panel__title">Up Next</span>
+          <div className="upnext-panel__header-actions" ref={menuRef}>
+            {isEditMode && selectedQueueItems.length > 0 && (
+              <button type="button" className="upnext-panel__bulk-remove" onClick={handleBulkRemoveSelected}>
+                Remove ({selectedQueueItems.length})
+              </button>
+            )}
+            <button
+              type="button"
+              className="upnext-panel__save-btn"
+              onClick={handleSaveQueue}
+              disabled={isSaving || items.length === 0}
+              title="Save queue as playlist"
+            >
+              <BookmarkPlus size={14} />
+            </button>
+            <button
+              type="button"
+              className="upnext-panel__clear-btn"
+              onClick={handleClearClick}
+              disabled={items.length === 0}
+              title="Clear queue"
+            >
+              Clear
+            </button>
+            <div className="upnext-panel__menu-shell">
+              <button
+                type="button"
+                className="upnext-panel__menu-btn"
+                onClick={handleMenuToggle}
+                aria-label="Queue options"
+                aria-expanded={isMenuOpen}
+              >
+                <MoreHorizontalIcon size={16} />
+              </button>
+              {isMenuOpen && (
+                <div
+                  className="upnext-panel__menu"
+                  role="menu"
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(e) => { e.stopPropagation(); handleEditQueue(); }}
+                  >
+                    <GripVertical size={14} />
+                    {isEditMode ? 'Close Edit' : 'Edit Queue'}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(e) => { e.stopPropagation(); handleFindNowPlaying(); }}
+                  >
+                    <LayoutList size={14} />
+                    Find Now Playing
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Queue list */}
+        <div
+          className={`upnext-panel__list ${isEditMode ? 'editing' : ''}`}
+          ref={listRef}
+        >
+          {items.length === 0 ? (
+            <div className="upnext-panel__empty">
+              <Music2 size={22} />
+              <p>Queue is empty</p>
+              <span>Play a track to start</span>
+            </div>
+          ) : (
+            items.map((item, index) => (
+              <div
+                key={getQueueItemKey(item, index)}
+                ref={(node) => {
+                  const playbackId = getTrackPlaybackId(item);
+                  if (node && playbackId) itemRefs.current.set(playbackId, node);
+                  else if (playbackId) itemRefs.current.delete(playbackId);
+                }}
+                className={`upnext-panel__item ${activeTrackId === getTrackPlaybackId(item) ? 'active' : ''} ${
+                  isEditMode ? 'editing' : ''
+                } ${selectedQueueItems.includes(getQueueItemKey(item, index)) ? 'selected' : ''} ${
+                  dragOverIndex === index ? 'drop-target' : ''
+                }`}
+                draggable={isEditMode}
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(event) => handleDragOver(event, index)}
+                onDrop={(event) => handleDrop(event, index)}
+                onDragEnd={handleDragEnd}
+                onClick={(event) => {
+                  if (isEditMode) {
+                    if (draggedIndex !== null) return;
+                    toggleSelectedItem(getQueueItemKey(item, index));
+                    return;
+                  }
+                  event.stopPropagation();
+                  onSelectTrack?.(item);
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (isEditMode) return;
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onSelectTrack?.(item);
+                  }
+                }}
+              >
+                {isEditMode && (
+                  <span className="upnext-panel__drag-handle" aria-hidden="true">
+                    <GripVertical size={13} />
+                  </span>
+                )}
+                {isEditMode && (
+                  <label className="upnext-panel__select-box" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedQueueItems.includes(getQueueItemKey(item, index))}
+                      onChange={() => toggleSelectedItem(getQueueItemKey(item, index))}
+                      aria-label={`Select ${item.title}`}
+                    />
+                    <span />
+                  </label>
+                )}
+                <img
+                  src={item.cover || item.image || FALLBACK_IMAGE}
+                  alt={item.title}
+                  loading="lazy"
+                  onError={(event) => {
+                    event.currentTarget.onerror = null;
+                    event.currentTarget.src = FALLBACK_IMAGE;
+                  }}
+                />
+                <div className="upnext-panel__item-info">
+                  <strong title={item.title}>{item.title}</strong>
+                  <span title={item.artist || item.subtitle}>{item.artist || item.subtitle}</span>
+                </div>
+                {!isEditMode && item.duration ? (
+                  <span className="upnext-panel__item-duration">
+                    {formatQueueDuration(item.duration)}
+                  </span>
+                ) : null}
+                {isEditMode && (
+                  <div className="upnext-panel__move-controls">
+                    <button
+                      type="button"
+                      onClick={(e) => handleMoveItem(e, index, index - 1)}
+                      disabled={index === 0}
+                      aria-label={`Move ${item.title} up`}
+                    >
+                      <ChevronUp size={11} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleMoveItem(e, index, index + 1)}
+                      disabled={index >= items.length - 1}
+                      aria-label={`Move ${item.title} down`}
+                    >
+                      <ChevronDown size={11} />
+                    </button>
+                  </div>
+                )}
+                {isEditMode ? (
+                  <button
+                    type="button"
+                    className="upnext-panel__remove-btn"
+                    onClick={(e) => handleRemoveItem(e, getQueueItemKey(item, index))}
+                    aria-label={`Remove ${item.title}`}
+                  >
+                    <X size={11} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="upnext-panel__item-play"
+                    onClick={(e) => { e.stopPropagation(); onPlayTrack?.(item); }}
+                    aria-label={`Play ${item.title}`}
+                  >
+                    <Play size={11} fill="currentColor" />
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* View Full Queue footer */}
+        {items.length > 0 && (
+          <div className="upnext-panel__footer">
+            <button
+              type="button"
+              className="upnext-panel__view-all"
+              onClick={handleSaveQueue}
+            >
+              View Full Queue ({items.length})
+            </button>
+          </div>
+        )}
+
+        {saveStatus.message && (
+          <p className={`upnext-panel__status ${saveStatus.type} visible`}>{saveStatus.message}</p>
+        )}
+
+        {undoState.visible && (
+          <div className="upnext-panel__undo-toast" role="status" aria-live="polite">
+            <span>Queue cleared</span>
+            <button type="button" onClick={handleUndoClear}>Undo</button>
+          </div>
+        )}
+
+        {isClearModalOpen && (
+          <div className="dashboard-queue__modal" role="presentation" onClick={() => setIsClearModalOpen(false)}>
+            <div
+              className="dashboard-queue__modal-card"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Clear queue confirmation"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <strong>Clear Queue</strong>
+              <p>Are you sure you want to clear the queue?</p>
+              <div className="dashboard-queue__modal-actions">
+                <button type="button" className="dashboard-queue__modal-secondary" onClick={() => setIsClearModalOpen(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="dashboard-queue__modal-primary" onClick={handleConfirmClear}>
+                  Clear Queue
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </aside>
+    );
+  }
+
+  // ─── MOBILE / COMPACT: original drawer behaviour ───────────────────────────
   return (
     <motion.aside
       className={`dashboard-queue ${isExpanded ? 'open' : 'collapsed'} ${isCompactLayout ? 'mobile' : 'desktop'} ${
         isEditMode ? 'editing' : ''
-      } ${isHovered ? 'hovered' : ''}`}
+      }`}
       role="complementary"
       aria-label="Playback queue"
-      onMouseEnter={() => !isCompactLayout && setIsHovered(true)}
-      onMouseLeave={() => {
-        if (!isCompactLayout) {
-          setIsHovered(false);
-          setIsMenuOpen(false);
-        }
-      }}
-      animate={{
-        width: isCompactLayout ? 'auto' : isHovered || isEditMode ? 'clamp(400px, 30vw, 500px)' : '72px',
-      }}
-      transition={{
-        width: {
-          duration: 0.28,
-          ease: 'easeInOut',
-        },
-      }}
     >
-      <motion.div
-        className="dashboard-queue__header"
-        animate={{
-          opacity: 1,
-          pointerEvents: 'auto',
-        }}
-        transition={{
-          opacity: { duration: 0.22 },
-        }}
-      >
-        <p className="dashboard-queue__title">
-          <ListMusic size={16} />
+      <motion.div className="dashboard-queue__header">
+        <div className="dashboard-queue__mobile-header-left">
+          <button className="dashboard-queue__mobile-back" onClick={(e) => { e.stopPropagation(); onToggleQueue?.(); }}>
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <span className="dashboard-queue__mobile-title">Now Playing</span>
+        </div>
+
+        <p className="dashboard-queue__title desktop-only">
+          <LayoutList size={16} />
           <span className="dashboard-queue__title-copy">
             <span className="dashboard-queue__title-text">Queue</span>
-            <small className="dashboard-queue__meta">{queueSummary}</small>
+            <small className="dashboard-queue__meta">
+              {items.length} {items.length === 1 ? 'song' : 'songs'}
+              {queueDuration > 0 ? ` · ${formatQueueDuration(queueDuration)}` : ''}
+            </small>
           </span>
         </p>
         <div className="dashboard-queue__header-actions" ref={menuRef}>
@@ -414,15 +531,10 @@ function Queue({
             disabled={isSaving}
             aria-label="Save queue"
             title="Save queue"
-            animate={{
-              opacity: 1,
-            }}
-            transition={{ opacity: { duration: 0.2 } }}
           >
             <BookmarkPlus size={14} />
             <span>{isSaving ? 'Saving...' : 'Save'}</span>
           </motion.button>
-
           <motion.button
             type="button"
             className="dashboard-queue__clear-inline"
@@ -430,10 +542,6 @@ function Queue({
             disabled={items.length === 0}
             aria-label="Clear queue"
             title="Clear queue"
-            animate={{
-              opacity: 1,
-            }}
-            transition={{ opacity: { duration: 0.2 } }}
           >
             <Trash2 size={14} />
             <span>Clear</span>
@@ -465,8 +573,7 @@ function Queue({
                 <button
                   type="button"
                   role="menuitem"
-                  onPointerDown={handleEditQueuePointerDown}
-                  onClick={handleEditQueueClick}
+                  onClick={(e) => { e.stopPropagation(); handleEditQueue(); }}
                 >
                   <GripVertical size={14} />
                   {isEditMode ? 'Close Edit Queue' : 'Edit Queue'}
@@ -474,10 +581,9 @@ function Queue({
                 <button
                   type="button"
                   role="menuitem"
-                  onPointerDown={handleFindNowPlayingPointerDown}
-                  onClick={handleFindNowPlayingClick}
+                  onClick={(e) => { e.stopPropagation(); handleFindNowPlaying(); }}
                 >
-                  <ListMusic size={14} />
+                  <LayoutList size={14} />
                   Find Now Playing
                 </button>
               </div>
@@ -487,10 +593,7 @@ function Queue({
             <button
               type="button"
               className="dashboard-queue__collapse"
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggleQueue?.();
-              }}
+              onClick={(event) => { event.stopPropagation(); onToggleQueue?.(); }}
               aria-label="Collapse queue"
             >
               <ChevronLeft size={16} />
@@ -499,16 +602,10 @@ function Queue({
         </div>
       </motion.div>
 
-      <motion.div
+      <div
         id="app-queue"
         className={`dashboard-queue__list ${isEditMode ? 'editing' : ''}`}
         ref={listRef}
-        animate={{
-                gridTemplateColumns: isCompactLayout || isHovered || isEditMode ? 'auto minmax(0, 1fr)' : '1fr',
-        }}
-        transition={{
-          gridTemplateColumns: { duration: 0.28 },
-        }}
       >
         {items.length === 0 ? (
           <div className="dashboard-queue__empty">
@@ -517,15 +614,12 @@ function Queue({
           </div>
         ) : (
           items.map((item, index) => (
-            <motion.div
+            <div
               key={getQueueItemKey(item, index)}
               ref={(node) => {
                 const playbackId = getTrackPlaybackId(item);
-                if (node && playbackId) {
-                  itemRefs.current.set(playbackId, node);
-                } else if (playbackId) {
-                  itemRefs.current.delete(playbackId);
-                }
+                if (node && playbackId) itemRefs.current.set(playbackId, node);
+                else if (playbackId) itemRefs.current.delete(playbackId);
               }}
               className={`dashboard-queue__item ${activeTrackId === getTrackPlaybackId(item) ? 'active' : ''} ${
                 isEditMode ? 'editing' : ''
@@ -539,38 +633,21 @@ function Queue({
               onDragEnd={handleDragEnd}
               onClick={(event) => {
                 if (isEditMode) {
-                  if (draggedIndex !== null) {
-                    return;
-                  }
-
+                  if (draggedIndex !== null) return;
                   toggleSelectedItem(getQueueItemKey(item, index));
                   return;
                 }
-
                 event.stopPropagation();
                 onSelectTrack?.(item);
               }}
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {
-                if (isEditMode) {
-                  return;
-                }
-
+                if (isEditMode) return;
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
                   onSelectTrack?.(item);
                 }
-              }}
-              animate={{
-                gridColumn: shouldShowQueueDetails ? '1 / -1' : 'auto',
-                justifySelf: shouldShowQueueDetails ? 'stretch' : 'center',
-                maxWidth: shouldShowQueueDetails ? 'none' : '64px',
-              }}
-              transition={{
-                gridColumn: { duration: 0.28 },
-                justifySelf: { duration: 0.28 },
-                maxWidth: { duration: 0.28 },
               }}
             >
               {isEditMode && (
@@ -578,18 +655,7 @@ function Queue({
                   <GripVertical size={14} />
                 </span>
               )}
-              {isEditMode && (
-                <label className="dashboard-queue__select-box" onClick={(event) => event.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={selectedQueueItems.includes(getQueueItemKey(item, index))}
-                    onChange={() => toggleSelectedItem(getQueueItemKey(item, index))}
-                    aria-label={`Select ${item.title}`}
-                  />
-                  <span />
-                </label>
-              )}
-              <motion.img
+              <img
                 src={item.cover || item.image || FALLBACK_IMAGE}
                 alt={item.title}
                 loading="lazy"
@@ -597,83 +663,39 @@ function Queue({
                   event.currentTarget.onerror = null;
                   event.currentTarget.src = FALLBACK_IMAGE;
                 }}
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.18 }}
               />
-              <motion.div
-                className="dashboard-queue__item-content"
-                animate={{
-                  opacity: shouldShowQueueDetails ? 1 : 0,
-                  maxWidth: shouldShowQueueDetails ? '100%' : '0px',
-                  pointerEvents: shouldShowQueueDetails ? 'auto' : 'none',
-                }}
-                transition={{
-                  opacity: { duration: 0.22 },
-                  maxWidth: { duration: 0.26 },
-                }}
-              >
+              <div className="dashboard-queue__item-content">
                 <strong title={item.title}>{item.title}</strong>
                 <span title={item.artist || item.subtitle}>{item.artist || item.subtitle}</span>
-              </motion.div>
+              </div>
               {!isEditMode && item.duration ? (
                 <span className="dashboard-queue__item-duration">{formatQueueDuration(item.duration)}</span>
               ) : null}
-              {isEditMode && (
-                <div className="dashboard-queue__move-controls" aria-label={`Move ${item.title}`}>
-                  <button
-                    type="button"
-                    className="dashboard-queue__move-btn"
-                    onClick={(event) => handleMoveItem(event, index, index - 1)}
-                    disabled={index === 0}
-                    aria-label={`Move ${item.title} up`}
-                    title="Move up"
-                  >
-                    <ChevronUp size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    className="dashboard-queue__move-btn"
-                    onClick={(event) => handleMoveItem(event, index, index + 1)}
-                    disabled={index >= items.length - 1}
-                    aria-label={`Move ${item.title} down`}
-                    title="Move down"
-                  >
-                    <ChevronDown size={12} />
-                  </button>
-                </div>
-              )}
-              {isEditMode && (
+              {isEditMode ? (
                 <button
                   type="button"
                   className="dashboard-queue__remove-btn"
-                  onClick={(event) => handleRemoveItem(event, getQueueItemKey(item, index))}
+                  onClick={(e) => handleRemoveItem(e, getQueueItemKey(item, index))}
                   aria-label={`Remove ${item.title} from queue`}
-                  title="Remove song"
                 >
                   <X size={12} />
                 </button>
-              )}
-              {!isEditMode && (
+              ) : (
                 <motion.button
                   type="button"
                   className="dashboard-queue__item-play"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onPlayTrack?.(item);
-                  }}
+                  onClick={(event) => { event.stopPropagation(); onPlayTrack?.(item); }}
                   aria-label={`Play ${item.title}`}
-                  title={`Play ${item.title}`}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
-                  transition={{ duration: 0.18 }}
                 >
                   <Play size={12} fill="currentColor" />
                 </motion.button>
               )}
-            </motion.div>
+            </div>
           ))
         )}
-      </motion.div>
+      </div>
 
       {saveStatus.message && (
         <p className={`dashboard-queue__save-status ${saveStatus.type} visible`}>{saveStatus.message}</p>
@@ -682,9 +704,7 @@ function Queue({
       {undoState.visible && (
         <div className="dashboard-queue__undo-toast" role="status" aria-live="polite">
           <span>Queue cleared</span>
-          <button type="button" onClick={handleUndoClear}>
-            Undo clear
-          </button>
+          <button type="button" onClick={handleUndoClear}>Undo clear</button>
         </div>
       )}
 
@@ -715,13 +735,10 @@ function Queue({
         <button
           type="button"
           className="dashboard-queue__peek-toggle"
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleQueue?.();
-          }}
+          onClick={(event) => { event.stopPropagation(); onToggleQueue?.(); }}
           aria-label="Expand queue"
         >
-          <ListMusic size={16} />
+          <LayoutList size={16} />
         </button>
       )}
     </motion.aside>
