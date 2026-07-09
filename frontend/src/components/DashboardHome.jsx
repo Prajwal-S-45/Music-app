@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Heart, Play } from 'lucide-react';
 import MusicCard from './MusicCard';
 import apiClient from '../api/client';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-const RECENTLY_PLAYED_KEY = 'music_app_recently_played';
 
 const DEFAULT_COVER =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1000&q=80';
@@ -26,9 +25,11 @@ const formatTrack = (track) => {
     return null;
   }
 
+  const trackId = track.videoId || track.id;
+
   return {
-    id: track.videoId || track.id,
-    videoId: track.videoId || track.id,
+    id: trackId,
+    videoId: trackId,
     title: track.title || 'Untitled Track',
     artist: track.channelTitle || track.artist || 'Unknown Artist',
     cover: track.thumbnail || track.cover || DEFAULT_COVER,
@@ -37,10 +38,12 @@ const formatTrack = (track) => {
   };
 };
 
-function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
+import { PodcastsView, RadioView } from './NewCategories';
+
+function DashboardHome({ user, recentlyPlayed = [], onTrackSelect, onAddToQueue, onLikeTrack, onTracksLoaded }) {
   const [tracks, setTracks] = useState([]);
-  const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activePill, setActivePill] = useState('All');
   const onTracksLoadedRef = useRef(onTracksLoaded);
 
   useEffect(() => {
@@ -48,40 +51,12 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
   }, [onTracksLoaded]);
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(RECENTLY_PLAYED_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const normalized = parsed.map((item) => {
-            const coverValue = String(item?.cover || '');
-            const migratedCover = coverValue.replace(
-              /^https?:\/\/localhost:\d+\/api\/music\/artwork\?/i,
-              `${API_URL}/api/music/artwork?`
-            );
-
-            return {
-              ...item,
-              cover: migratedCover || item?.cover,
-            };
-          });
-
-          setRecentlyPlayed(normalized);
-          window.localStorage.setItem(RECENTLY_PLAYED_KEY, JSON.stringify(normalized));
-        }
-      }
-    } catch {
-      window.localStorage.removeItem(RECENTLY_PLAYED_KEY);
-    }
-  }, []);
-
-  useEffect(() => {
     const loadTrending = async () => {
       try {
         setLoading(true);
 
         const response = await apiClient.get('/api/trending', {
-          params: { limit: 18 },
+          params: { limit: 40 },
         });
         const trendingTracks = Array.isArray(response.data?.data)
           ? response.data.data
@@ -104,13 +79,14 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
   }, []);
 
   const recentCards = useMemo(() => {
-    return recentlyPlayed.length > 0 ? recentlyPlayed.slice(0, 6) : tracks.slice(0, 6);
+    return recentlyPlayed.length > 0 ? recentlyPlayed.slice(0, 18) : tracks.slice(0, 18);
   }, [recentlyPlayed, tracks]);
 
   const curatedMixes = useMemo(() => {
     const source = tracks.length > 0 ? tracks : recentCards;
-    return source.slice(0, 6).map((track, index) => ({
-      id: `daily-${track.id}`,
+    const pool = [...source].reverse();
+    return pool.slice(0, 15).map((track, index) => ({
+      id: `daily-${track.id}-${index}`,
       title: `Daily Mix ${index + 1}`,
       subtitle: `Inspired by ${track.artist}`,
       cover: track.cover,
@@ -120,55 +96,70 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
 
   const trendingMixes = useMemo(() => {
     const source = tracks.length > 0 ? tracks : recentCards;
-    return source.slice(6, 12).map((track, index) => ({
-      id: `trend-${track.id}`,
+    const startOffset = source.length > 15 ? 5 : 0;
+    return source.slice(startOffset, startOffset + 25).map((track, index) => ({
+      id: `trend-${track.id}-${index}`,
       title: track.title,
-      subtitle: `${track.artist} • ${formatDuration(track.duration)}`,
+      subtitle: `${track.artist} - ${formatDuration(track.duration)}`,
       cover: track.cover,
       track,
     }));
   }, [tracks, recentCards]);
 
+  const featuredTrack = tracks[0] || recentCards[0] || null;
+
   const playTrack = useCallback((track) => {
     if (!track) return;
-
     onTrackSelect?.(track);
-
-    try {
-      setRecentlyPlayed((currentRecent) => {
-        const next = [{ ...track, playedAt: Date.now() }, ...currentRecent.filter((item) => item.id !== track.id)].slice(0, 8);
-        window.localStorage.setItem(RECENTLY_PLAYED_KEY, JSON.stringify(next));
-        return next;
-      });
-    } catch {
-      // Ignore storage failures.
-    }
   }, [onTrackSelect]);
 
   return (
-    <div className="dashboard-home">
-      <section className="dashboard-hero">
-        <div>
-          <span className="dashboard-hero__tag">Your personalized soundscape</span>
-          <h2>Made for {user?.name || 'you'}</h2>
+    <div className="dashboard-home dashboard-home--desktop-reference">
+      
+
+
+      {activePill === 'Podcasts' && <PodcastsView />}
+      
+      {activePill !== 'Podcasts' && (
+        <>
+          <section className="dashboard-hero">
+        <div className="dashboard-hero__content">
+          {user?.isPremium && <span className="dashboard-hero__tag">PREMIUM</span>}
+          <h1>Made for {user?.name ? user.name.toLowerCase() : 'you'}</h1>
           <p>
-            Explore trending music, revisit the songs you played recently, and jump into a cleaner streaming
-            experience designed with a modern Spotify and JioSaavn feel.
+            Dive back into your favorite tracks or discover something new.
           </p>
+
+          <div className="dashboard-hero__actions">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="btn-primary"
+              onClick={() => featuredTrack && onTrackSelect?.(featuredTrack)}
+            >
+              <Play size={18} fill="currentColor" />
+              <span>Play Now</span>
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="btn-secondary"
+              onClick={() => featuredTrack && onLikeTrack?.(featuredTrack)}
+              aria-label="Like featured track"
+            >
+              <Heart size={18} />
+            </motion.button>
+          </div>
         </div>
 
-        <div className="dashboard-hero__stats">
-          <div>
-            <strong>{tracks.length || '18+'}</strong>
-            <span>Trending tracks</span>
-          </div>
-          <div>
-            <strong>{recentCards.length || '6'}</strong>
-            <span>Recently played</span>
-          </div>
-          <div>
-            <strong>HQ</strong>
-            <span>YouTube playback</span>
+        <div className="dashboard-hero__right-rail">
+          <div className="dashboard-hero__artwork">
+            <span className="dashboard-hero__vinyl" aria-hidden="true" />
+            <img
+              src={featuredTrack?.cover || DEFAULT_COVER}
+              alt={featuredTrack ? `${featuredTrack.title} artwork` : 'Featured artwork'}
+            />
+            <div className="dashboard-hero__artwork-glow" />
           </div>
         </div>
       </section>
@@ -177,7 +168,6 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
         <div className="dashboard-section__header">
           <div>
             <h3>Recently Played</h3>
-            <p>Quick access to the songs you loved most.</p>
           </div>
         </div>
 
@@ -190,25 +180,27 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
                 key={item.id}
                 image={item.cover}
                 title={item.title}
-                subtitle={`${item.artist} • ${formatDuration(item.duration)}`}
+                subtitle={item.artist}
                 eyebrow="Recently played"
                 compact
                 track={item}
                 onPlayTrack={playTrack}
+                onAddToQueue={onAddToQueue}
+                onLikeTrack={onLikeTrack}
               />
             )
           ))}
         </div>
       </section>
+
       <section className="dashboard-section">
         <div className="dashboard-section__header">
           <div>
-            <h3>Made Just For You</h3>
-            <p>Playlist-inspired cards that feel alive and easy to explore.</p>
+            <h3>Trending Now</h3>
           </div>
         </div>
 
-        <div className="dashboard-grid-cards">
+        <div className="dashboard-scroll-row">
           {curatedMixes.map((mix) => (
             <MusicCard
               key={mix.id}
@@ -218,6 +210,8 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
               eyebrow="Playlist"
               track={mix.track}
               onPlayTrack={playTrack}
+              onAddToQueue={onAddToQueue}
+              onLikeTrack={onLikeTrack}
             />
           ))}
         </div>
@@ -231,7 +225,7 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
           </div>
         </div>
 
-        <div className="dashboard-grid-cards">
+        <div className="dashboard-scroll-row">
           {trendingMixes.map((mix) => (
             <MusicCard
               key={mix.id}
@@ -241,10 +235,40 @@ function DashboardHome({ user, onTrackSelect, onTracksLoaded }) {
               eyebrow="Trending"
               track={mix.track}
               onPlayTrack={playTrack}
+              onAddToQueue={onAddToQueue}
+              onLikeTrack={onLikeTrack}
             />
           ))}
         </div>
       </section>
+
+      <section className="dashboard-section">
+        <div className="dashboard-section__header">
+          <div>
+            <h3>Made For You</h3>
+          </div>
+        </div>
+
+        <div className="dashboard-scroll-row">
+          {curatedMixes.map((mix) => (
+            <MusicCard
+              key={mix.id}
+              image={mix.cover}
+              title={mix.title}
+              subtitle={mix.subtitle}
+              eyebrow="Made For You"
+              track={mix.track}
+              onPlayTrack={playTrack}
+              onAddToQueue={onAddToQueue}
+              onLikeTrack={onLikeTrack}
+            />
+          ))}
+        </div>
+      </section>
+        </>
+      )}
+
+      {activePill === 'Radio' && <RadioView />}
     </div>
   );
 }
