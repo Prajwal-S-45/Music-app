@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useSocketRoom from '../hooks/useSocketRoom';
 import apiClient from '../api/client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const DEFAULT_TRACK = {
   id: 'default-track',
   title: 'Now Playing',
@@ -81,7 +81,7 @@ function SyncedMusicPlayer({
             if (songs.length > 0) {
               break;
             }
-          } catch (requestError) {
+          } catch {
             // Try next endpoint.
           }
         }
@@ -91,7 +91,7 @@ function SyncedMusicPlayer({
           setCurrentTrack(firstSong);
           setStatus('Loaded song from catalog for sync.');
         }
-      } catch (error) {
+      } catch {
         setStatus('Could not load a playable song from catalog.');
       }
     };
@@ -124,7 +124,7 @@ function SyncedMusicPlayer({
 
       try {
         audio.currentTime = safeTime;
-      } catch (error) {
+      } catch {
         // Ignore if metadata is not loaded yet.
       }
 
@@ -134,7 +134,7 @@ function SyncedMusicPlayer({
       if (shouldPlay) {
         try {
           await audio.play();
-        } catch (error) {
+        } catch {
           setStatus('Playback was blocked by browser policy. Click Play.');
         }
       } else {
@@ -215,7 +215,7 @@ function SyncedMusicPlayer({
         ignoreNextSeekEmitRef.current = true;
         try {
           audio.currentTime = safeTime;
-        } catch (error) {
+        } catch {
           // Ignore seek errors until metadata exists.
         }
       }
@@ -312,7 +312,7 @@ function SyncedMusicPlayer({
         currentTime: audio.currentTime,
         isPlaying: true,
       });
-    } catch (error) {
+    } catch {
       setStatus('Click interaction required to start audio.');
     }
   };
