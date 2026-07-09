@@ -1,23 +1,28 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../styles/Header.css';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
+  Bell,
   ChevronDown,
   Globe2,
   History,
   LogOut,
   Mic2,
   Music2,
+  Radio,
   Search,
   Settings,
+  Star,
   UserCircle2,
+  Menu,
 } from 'lucide-react';
 import SearchDropdown from './SearchDropdown';
 
 const navItems = [
   { label: 'Music', icon: Music2 },
   { label: 'Podcasts', icon: Mic2 },
-  { label: 'Pro', icon: UserCircle2 },
+  { label: 'Radio', icon: Radio },
 ];
 
 const languageOptions = [
@@ -27,14 +32,15 @@ const languageOptions = [
 ];
 
 const placeholderPhrases = [
-  'Search songs, artists, albums...',
+  'Search songs, artists, albums, podcasts...',
   'Ask for a mood, artist, or playlist...',
   'Discover trending sounds near you...',
 ];
 
 const recentSearches = ['Kannada hits', 'Lo-fi focus', 'Arijit Singh', '90s love songs'];
 
-function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout, onPlayTrack, onLikeTrack, onQueueTrack }) {
+function Header({ userName, user, onSearchSubmit, language, onLanguageChange, onLogout, onPlayTrack, onLikeTrack, onQueueTrack, onToggleSidebar }) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
@@ -61,7 +67,6 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
       ) {
         setAvatarOpen(false);
       }
-
       if (
         languageOpen &&
         languageMenuRef.current && !languageMenuRef.current.contains(event.target) &&
@@ -69,7 +74,6 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
       ) {
         setLanguageOpen(false);
       }
-
       if (
         searchExpanded &&
         searchShellRef.current && !searchShellRef.current.contains(event.target)
@@ -79,13 +83,10 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
         setSearchExpanded(false);
       }
     }
-
     if (avatarOpen || languageOpen || searchExpanded) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [avatarOpen, languageOpen, searchExpanded]);
 
   useEffect(() => {
@@ -93,12 +94,10 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
       const dashboardScroll = document.querySelector('.dashboard-scroll');
       setIsScrolled((window.scrollY || dashboardScroll?.scrollTop || 0) > 8);
     };
-
     const dashboardScroll = document.querySelector('.dashboard-scroll');
     window.addEventListener('scroll', handleScroll, { passive: true });
     dashboardScroll?.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
-
     return () => {
       window.removeEventListener('scroll', handleScroll);
       dashboardScroll?.removeEventListener('scroll', handleScroll);
@@ -109,24 +108,19 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
     let characterIndex = 0;
     let timeoutId;
     const phrase = placeholderPhrases[placeholderIndex];
-
     const typeNext = () => {
       setTypedPlaceholder(phrase.slice(0, characterIndex + 1));
       characterIndex += 1;
-
       if (characterIndex < phrase.length) {
         timeoutId = window.setTimeout(typeNext, 42);
         return;
       }
-
       timeoutId = window.setTimeout(() => {
         setPlaceholderIndex((value) => (value + 1) % placeholderPhrases.length);
       }, 1800);
     };
-
     setTypedPlaceholder('');
     timeoutId = window.setTimeout(typeNext, 220);
-
     return () => window.clearTimeout(timeoutId);
   }, [placeholderIndex]);
 
@@ -143,68 +137,65 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
   const handleSubmit = (event) => {
     event.preventDefault();
     const trimmed = query.trim();
-    if (!trimmed) {
-      setDropdownOpen(false);
-      return;
-    }
-
+    if (!trimmed) { setDropdownOpen(false); return; }
     onSearchSubmit?.(trimmed);
+    setQuery('');
     setDropdownOpen(false);
+    setSearchFocused(false);
   };
 
   const handleSearchSelect = (result) => {
     const nextQuery = String(result?.title || result?.query || '').trim();
     if (!nextQuery) return;
-
-    setQuery(nextQuery);
     setDropdownOpen(false);
-
+    setSearchFocused(false);
     onSearchSubmit?.(nextQuery);
+    setQuery('');
   };
 
   const handleRecentSearch = (value) => {
-    setQuery(value);
     setDropdownOpen(false);
     setSearchFocused(false);
     onSearchSubmit?.(value);
+    setQuery('');
   };
 
-  const handleDropdownPlay = (song) => {
-    onPlayTrack?.(song);
-    setDropdownOpen(false);
-  };
-
-  const handleDropdownLike = (song) => {
-    onLikeTrack?.(song);
-  };
-
-  const handleDropdownQueue = (song) => {
-    onQueueTrack?.(song);
-    setDropdownOpen(false);
-  };
+  const handleDropdownPlay = (song) => { onPlayTrack?.(song); setDropdownOpen(false); };
+  const handleDropdownLike = (song) => { onLikeTrack?.(song); };
+  const handleDropdownQueue = (song) => { onQueueTrack?.(song); setDropdownOpen(false); };
 
   return (
     <motion.header
-      initial={{ opacity: 0, y: -16, scale: 0.985 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.46, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
       className={`app-header ${isScrolled ? 'scrolled' : ''}`}
     >
       <div className="app-header__ambient" aria-hidden="true" />
 
+      {/* BRAND LOGO (Mobile/Tablet Only) */}
+      <div className="app-header__brand-mobile">
+        <button type="button" className="app-header__menu-btn" onClick={onToggleSidebar} aria-label="Toggle Sidebar">
+          <Menu size={24} />
+        </button>
+        <div className="app-header__brand-mark">
+          <span>{userName ? userName.charAt(0).toUpperCase() : 'M'}</span>
+        </div>
+        <div className="app-header__brand-copy">
+          <strong>Music App</strong>
+          {user?.isPremium && <span>Premium Streaming</span>}
+        </div>
+      </div>
+
+      {/* LEFT: Brand Logo (Desktop) & Navigation Tabs */}
       <div className="app-header__left">
-        <div className="app-header__brand" aria-label="Music App">
+        <div className="app-header__brand-desktop">
           <div className="app-header__brand-mark">
-            M
-            <span className="app-header__waveform" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
+            <span>{userName ? userName.charAt(0).toUpperCase() : 'M'}</span>
           </div>
           <div className="app-header__brand-copy">
             <strong>Music App</strong>
-            <span>Premium streaming</span>
+            {user?.isPremium && <span>Premium Streaming</span>}
           </div>
         </div>
 
@@ -212,7 +203,6 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = activeTab === item.label;
-
             return (
               <motion.button
                 key={item.label}
@@ -229,7 +219,7 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
                     transition={{ type: 'spring', stiffness: 420, damping: 34 }}
                   />
                 )}
-                <Icon size={15} />
+                <Icon size={14} />
                 <span>{item.label}</span>
               </motion.button>
             );
@@ -237,14 +227,14 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
         </nav>
       </div>
 
-
+      {/* CENTER: Search bar */}
       <div className="app-header__center">
         <motion.div
           ref={searchShellRef}
           className={`app-header__search-shell ${searchExpanded ? 'expanded' : ''}`}
           animate={{
-            scale: searchExpanded ? 1.012 : 1,
-            maxWidth: searchExpanded ? 860 : 650,
+            scale: searchExpanded ? 1.01 : 1,
+            maxWidth: searchExpanded ? 760 : 560,
           }}
           transition={{ type: 'spring', stiffness: 320, damping: 30 }}
         >
@@ -256,10 +246,10 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
           >
             <motion.span
               className="app-header__search-icon"
-              animate={{ rotate: searchExpanded ? 10 : 0, scale: searchExpanded ? 1.12 : 1 }}
+              animate={{ rotate: searchExpanded ? 10 : 0, scale: searchExpanded ? 1.1 : 1 }}
               transition={{ type: 'spring', stiffness: 280, damping: 18 }}
             >
-              <Search size={18} className="search-icon" />
+              <Search size={17} className="search-icon" />
             </motion.span>
             <input
               ref={searchInputRef}
@@ -280,9 +270,7 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
               onBlur={() => {
                 window.setTimeout(() => {
                   setSearchFocused(false);
-                  if (!query.trim()) {
-                    setSearchExpanded(false);
-                  }
+                  if (!query.trim()) setSearchExpanded(false);
                 }, 160);
               }}
             />
@@ -329,19 +317,9 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
           <SearchDropdown
             isOpen={dropdownOpen && Boolean(query.trim())}
             query={query}
-            onClose={() => {
-              setDropdownOpen(false);
-              setSearchExpanded(false);
-            }}
-            onClear={() => {
-              setQuery('');
-              setDropdownOpen(false);
-              setSearchExpanded(false);
-            }}
-            onSearchSelect={(result) => {
-              handleSearchSelect(result);
-              setSearchExpanded(false);
-            }}
+            onClose={() => { setDropdownOpen(false); setSearchExpanded(false); }}
+            onClear={() => { setQuery(''); setDropdownOpen(false); setSearchExpanded(false); }}
+            onSearchSelect={(result) => { handleSearchSelect(result); setSearchExpanded(false); }}
             onPlayTrack={handleDropdownPlay}
             onLikeTrack={handleDropdownLike}
             onMoreTrack={handleDropdownQueue}
@@ -349,7 +327,24 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
         </motion.div>
       </div>
 
+      {/* RIGHT: Upgrade to Premium + Bell + Language + Avatar */}
       <div className="app-header__right">
+
+
+        {/* Notification bell */}
+        <motion.button
+          type="button"
+          className="app-header__icon-btn"
+          aria-label="Notifications"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <Bell size={18} />
+        </motion.button>
+
+
+
+        {/* Language selector */}
         <div className="app-header__language">
           <motion.button
             ref={languageToggleRef}
@@ -361,11 +356,10 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
             whileTap={{ scale: 0.97 }}
           >
             <span className="app-header__language-icon">
-              <Globe2 size={16} />
+              <Globe2 size={15} />
             </span>
-            <span className="app-header__language-copy">Music Preferences</span>
-            <strong>{selectedLanguage.label}</strong>
-            <ChevronDown size={14} className={`app-header__chevron ${languageOpen ? 'open' : ''}`} />
+            <strong>{selectedLanguage.flag}</strong>
+            <ChevronDown size={13} className={`app-header__chevron ${languageOpen ? 'open' : ''}`} />
           </motion.button>
 
           <AnimatePresence>
@@ -380,26 +374,21 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
               >
                 <div className="app-header__language-menu-header">
                   <h4>Preferred Music</h4>
-                  <p>Choose the languages you want to discover music in. Your results and mix will adjust.</p>
+                  <p>Choose the languages you want to discover music in.</p>
                 </div>
-
                 <div className="app-header__language-list">
                   {languageOptions.map((option) => (
                     <button
                       key={option.value}
                       type="button"
                       className={selectedLanguage.label === option.label ? 'active' : ''}
-                      onClick={() => {
-                        onLanguageChange?.(option.value);
-                        setLanguageOpen(false);
-                      }}
+                      onClick={() => { onLanguageChange?.(option.value); setLanguageOpen(false); }}
                     >
                       <span>{option.flag}</span>
                       <strong>{option.label}</strong>
                     </button>
                   ))}
                 </div>
-
                 <div className="app-header__language-note">
                   <span>Note</span>
                   <p>This affects songs and trends. UI language remains in English.</p>
@@ -409,6 +398,7 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
           </AnimatePresence>
         </div>
 
+        {/* Avatar */}
         <div className="app-header__avatar">
           <motion.button
             ref={avatarToggleRef}
@@ -421,11 +411,15 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
           >
             <div className="app-header__avatar-pill">
               <div className="app-header__avatar-halo">
-                {initials}
+                <img 
+                  src={user?.avatar || 'http://localhost:5000/uploads/profile_avatar.png'} 
+                  alt="" 
+                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} 
+                />
                 <span className="app-header__avatar-online" />
               </div>
-              <span className="app-header__avatar-name">{userName || 'Prajwal'}</span>
-              <ChevronDown size={14} className={`app-header__chevron ${avatarOpen ? 'open' : ''}`} />
+              <span className="app-header__avatar-name">{userName || 'Listener'}</span>
+              <ChevronDown size={13} className={`app-header__chevron ${avatarOpen ? 'open' : ''}`} />
             </div>
           </motion.button>
 
@@ -440,22 +434,26 @@ function Header({ userName, onSearchSubmit, language, onLanguageChange, onLogout
                 className="app-header__account-menu"
               >
                 <div className="app-header__account-identity">
-                  <span>{initials}</span>
+                  <img 
+                    src={user?.avatar || 'http://localhost:5000/uploads/profile_avatar.png'} 
+                    alt="" 
+                    style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', display: 'block' }} 
+                  />
                   <div>
                     <strong>{userName || 'Listener'}</strong>
                     <small>Online now</small>
                   </div>
                 </div>
                 <div className="app-header__menu-divider" />
-                <button type="button">
-                  <UserCircle2 size={16} /> <span>Profile</span>
+                <button type="button" onClick={() => { navigate('/profile'); setAvatarOpen(false); }}>
+                  <UserCircle2 size={15} /> <span>Profile</span>
                 </button>
-                <button type="button">
-                  <Settings size={16} /> <span>Settings</span>
+                <button type="button" onClick={() => { navigate('/settings'); setAvatarOpen(false); }}>
+                  <Settings size={15} /> <span>Settings</span>
                 </button>
                 <div className="app-header__menu-divider" />
                 <button type="button" className="app-header__logout" onClick={onLogout}>
-                  <LogOut size={16} /> <span>Sign Out</span>
+                  <LogOut size={15} /> <span>Sign Out</span>
                 </button>
               </motion.div>
             )}
