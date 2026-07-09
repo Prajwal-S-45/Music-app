@@ -1,6 +1,6 @@
-import React, { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Clock3, Heart, Play } from 'lucide-react';
+import { Disc3, Heart, ListMusic, MoreVertical, Play, Plus, UserRound } from 'lucide-react';
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1000&q=80';
@@ -12,7 +12,25 @@ const formatDuration = (seconds) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-function SearchResultListItem({ song, index, isLiked, onPlayTrack, onQueueTrack, onLikeTrack }) {
+function SearchResultListItem({ song, index, isLiked, onPlayTrack, onQueueTrack, onLikeTrack, onOpenArtist, onOpenAlbum }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [menuOpen]);
+
   const handlePlay = useCallback(() => {
     onPlayTrack?.(song);
   }, [onPlayTrack, song]);
@@ -26,6 +44,18 @@ function SearchResultListItem({ song, index, isLiked, onPlayTrack, onQueueTrack,
     event.stopPropagation();
     onLikeTrack?.(song);
   }, [onLikeTrack, song]);
+
+  const handleOpenArtist = useCallback((event) => {
+    event.stopPropagation();
+    setMenuOpen(false);
+    onOpenArtist?.(song.artist);
+  }, [onOpenArtist, song.artist]);
+
+  const handleOpenAlbum = useCallback((event) => {
+    event.stopPropagation();
+    setMenuOpen(false);
+    onOpenAlbum?.(song.album);
+  }, [onOpenAlbum, song.album]);
 
   const handleImageError = useCallback((event) => {
     event.currentTarget.onerror = null;
@@ -41,7 +71,6 @@ function SearchResultListItem({ song, index, isLiked, onPlayTrack, onQueueTrack,
     <motion.article
       whileHover={{ x: 2, scale: 1.006 }}
       whileTap={{ scale: 0.994 }}
-      className="group search-result-row-glass grid w-full grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-2 rounded-[16px] border border-white/10 bg-[rgba(15,23,42,0.72)] px-2.5 py-2 text-left shadow-[0_10px_22px_rgba(2,6,23,0.28)] backdrop-blur-xl transition duration-200 hover:border-emerald-300/25 hover:bg-[rgba(15,23,42,0.88)]"
       onClick={handlePlay}
       role="button"
       tabIndex={0}
@@ -51,6 +80,7 @@ function SearchResultListItem({ song, index, isLiked, onPlayTrack, onQueueTrack,
           handlePlay();
         }
       }}
+      className="group search-result-row-glass"
     >
       <span className="hidden w-7 flex-shrink-0 text-center text-[11px] font-semibold tracking-[0.04em] text-slate-400/85 md:inline-block">
         {String((index ?? 0) + 1).padStart(2, '0')}
@@ -79,46 +109,71 @@ function SearchResultListItem({ song, index, isLiked, onPlayTrack, onQueueTrack,
           <h3 className="truncate text-[13px] font-semibold leading-tight text-slate-100 transition group-hover:text-white sm:text-[14px] md:text-[15px]">
             {song.title}
           </h3>
-          {song.duration ? (
-            <span className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-300/90 sm:inline-flex">
-              <Clock3 size={11} /> {formatDuration(song.duration)}
-            </span>
-          ) : (
-            <span className="hidden items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-300/90 sm:inline-flex">
-              Preview
-            </span>
-          )}
         </div>
 
-        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-slate-300/85 sm:text-xs">
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-slate-300/85 sm:text-xs">
           <span className="truncate font-medium text-slate-200/95">{song.artist}</span>
-          <span className="h-1 w-1 rounded-full bg-slate-500/75" />
-          <span className="truncate text-slate-400/90">{song.album || 'Single'}</span>
-          <span className="hidden h-1 w-1 rounded-full bg-slate-500/75 md:inline-flex" />
-          <span className="hidden text-slate-400/85 md:inline-flex">HQ preview</span>
         </div>
       </div>
 
-      <div className="flex flex-shrink-0 items-center gap-1">
+      <div ref={menuRef} className="relative flex flex-shrink-0 items-center gap-1.5">
+        <span className="search-result-row-glass__duration">{formatDuration(song.duration)}</span>
         <button
           type="button"
-          className="hidden rounded-full border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-200/90 transition hover:border-emerald-300/30 hover:bg-white/12 hover:text-white sm:inline-flex"
+          className="search-row-action"
           onClick={handleQueue}
+          aria-label={`Add ${song.title} to queue`}
+          title="Add to queue"
         >
-          Queue
+          <ListMusic size={16} />
         </button>
         <button
           type="button"
-          className={`inline-flex items-center justify-center rounded-full border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] transition ${
-            isLiked
-              ? 'border-rose-400/30 bg-rose-500/20 text-rose-200'
-              : 'border-white/10 bg-white/5 text-slate-200/90 hover:border-white/20 hover:bg-white/12 hover:text-white'
-          }`}
+          className={`search-row-action ${isLiked ? 'is-liked' : ''}`}
           onClick={handleLike}
           aria-label={isLiked ? 'Unlike song' : 'Like song'}
+          title={isLiked ? 'Liked' : 'Like song'}
         >
-          <Heart size={14} fill={isLiked ? 'currentColor' : 'none'} />
+          <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
         </button>
+        <button
+          type="button"
+          className="search-row-action"
+          onClick={(event) => {
+            event.stopPropagation();
+            setMenuOpen((value) => !value);
+          }}
+          aria-label="Open song actions"
+          title="More actions"
+        >
+          <MoreVertical size={17} />
+        </button>
+        {menuOpen ? (
+          <div className="search-row-menu">
+            <button type="button" onClick={handleQueue}>
+              <ListMusic size={15} />
+              Add to queue
+            </button>
+            <button type="button" disabled title="Playlist action unavailable">
+              <Plus size={15} />
+              Add to playlist
+            </button>
+            <button type="button" onClick={handleLike}>
+              <Heart size={15} fill={isLiked ? 'currentColor' : 'none'} />
+              {isLiked ? 'Liked song' : 'Like song'}
+            </button>
+            <button type="button" onClick={handleOpenArtist}>
+              <UserRound size={15} />
+              Open artist
+            </button>
+            {song.album && (
+              <button type="button" onClick={handleOpenAlbum}>
+                <Disc3 size={15} />
+                Open album
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
     </motion.article>
   );
