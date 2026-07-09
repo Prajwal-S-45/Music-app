@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { Edit3, PlayCircle, Trash2 } from 'lucide-react';
 
 const FALLBACK_IMAGE =

@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { deleteSavedQueue, getSavedQueues, renameSavedQueue } from '../utils/savedQueues';
-import ArtistsPage from './ArtistsPage';
 import PlaylistCard from './PlaylistCard';
+import { Search, Plus } from 'lucide-react';
 import '../styles/Playlists.css';
 
-function Playlists({ onPlayAll }) {
+function Playlists({ onPlayAll, user }) {
   const [savedQueues, setSavedQueues] = useState([]);
   const [sortBy, setSortBy] = useState('newest');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
-  const artistsSectionRef = useRef(null);
   const clearMessageTimerRef = useRef(null);
 
   const showSuccessMessage = useCallback((message) => {
@@ -45,16 +44,10 @@ function Playlists({ onPlayAll }) {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('section') !== 'artists') {
-      return;
+    if (params.get('section') === 'artists') {
+      navigate('/artists', { replace: true });
     }
-
-    const timerId = window.setTimeout(() => {
-      artistsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 0);
-
-    return () => window.clearTimeout(timerId);
-  }, [location.search]);
+  }, [location.search, navigate]);
 
   const sortedQueues = useMemo(() => {
     const queues = savedQueues.slice();
@@ -73,8 +66,7 @@ function Playlists({ onPlayAll }) {
   const handleDeleteQueue = useCallback((queueId) => {
     deleteSavedQueue(queueId);
     setSavedQueues(getSavedQueues());
-
-    showSuccessMessage('Saved queue deleted');
+    showSuccessMessage('Playlist deleted');
   }, [showSuccessMessage]);
 
   const handleRenameQueue = useCallback((queue) => {
@@ -94,11 +86,12 @@ function Playlists({ onPlayAll }) {
 
   const handlePlayAll = useCallback((queue) => {
     if (!queue?.songs?.length) {
+      showSuccessMessage('This playlist is empty');
       return;
     }
 
     onPlayAll?.(queue.songs);
-  }, [onPlayAll]);
+  }, [onPlayAll, showSuccessMessage]);
 
   const handleOpenQueue = useCallback((queueId) => {
     navigate(`/library/saved/${queueId}`);
@@ -108,34 +101,94 @@ function Playlists({ onPlayAll }) {
     setSortBy(event.target.value);
   }, []);
 
+  const handleCreatePlaylist = () => {
+    const name = window.prompt('Enter playlist name:');
+    if (!name) return;
+
+    const now = Date.now();
+    const queueId = `saved-queue-${now}-${Math.random().toString(36).slice(2, 8)}`;
+    const newQueue = {
+      id: queueId,
+      name: name.trim(),
+      songs: [],
+      songCount: 0,
+      cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80',
+      createdAt: now
+    };
+
+    const STORAGE_KEY = 'music_app_saved_queues_v1';
+    const rawValue = window.localStorage.getItem(STORAGE_KEY);
+    let queues = [];
+    if (rawValue) {
+      try {
+        queues = JSON.parse(rawValue);
+      } catch (e) {
+        queues = [];
+      }
+    }
+    const updatedQueues = [newQueue, ...queues];
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedQueues));
+    window.dispatchEvent(new CustomEvent('savedQueuesUpdated'));
+
+    setSavedQueues(updatedQueues);
+    showSuccessMessage('Playlist created successfully!');
+  };
+
   return (
     <div className="playlists-panel">
-      <div className="playlists-header">
-        <h3>Your Library</h3>
-        <p>Saved queues are stored locally so you can replay them anytime.</p>
-      </div>
-
-      <div className="playlist-toolbar">
-        <label>
-          Sort
-          <select value={sortBy} onChange={handleSortChange}>
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-            <option value="az">A-Z</option>
-          </select>
-        </label>
-      </div>
-
-      {sortedQueues.length === 0 && (
-        <div className="empty-state">
-          <p>No saved queues yet. Save your current queue from the queue panel.</p>
+      {/* Mobile-only Library Header */}
+      <div className="library-mobile-header">
+        <div className="library-mobile-header-top">
+          <div className="library-profile-btn" onClick={() => navigate('/profile')}>
+            {user?.name ? user.name.charAt(0).toUpperCase() : 'P'}
+          </div>
+          <span className="library-title">Your Library</span>
+          <div className="library-actions">
+            <button aria-label="Search Library">
+              <Search size={20} />
+            </button>
+            <button aria-label="Create Playlist" onClick={handleCreatePlaylist}>
+              <Plus size={24} />
+            </button>
+          </div>
         </div>
-      )}
+        <div className="library-mobile-pills">
+          <button className="active" onClick={() => navigate('/library')}>Playlists</button>
+          <button onClick={() => navigate('/artists')}>Artists</button>
+        </div>
+      </div>
+
+      <div className="playlists-header desktop-only">
+        <div className="playlists-header-left">
+          <h1>Playlists</h1>
+          <p>Create, organize and find the perfect playlist for every moment.</p>
+        </div>
+        <button className="create-playlist-btn-top" onClick={handleCreatePlaylist}>
+          <Plus size={16} /> Create Playlist
+        </button>
+      </div>
+
+      <div className="playlists-section-title">
+        <h3>Your Playlists</h3>
+        {sortedQueues.length > 0 && (
+          <div className="playlist-toolbar">
+            <label>
+              Sort
+              <select value={sortBy} onChange={handleSortChange}>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="az">A-Z</option>
+              </select>
+            </label>
+          </div>
+        )}
+      </div>
 
       {success && <div className="playlist-message success">{success}</div>}
 
+      {/* Renders both the grid of playlists (if they exist) and the bottom empty state card exactly as represented in reference image */}
       {sortedQueues.length > 0 && (
-        <div className="playlist-grid">
+        <div className="playlist-grid" style={{ marginBottom: '24px' }}>
           {sortedQueues.map((queue) => (
             <PlaylistCard
               key={queue.id}
@@ -149,8 +202,25 @@ function Playlists({ onPlayAll }) {
         </div>
       )}
 
-      <div ref={artistsSectionRef} id="artists">
-        <ArtistsPage embedded />
+      {/* Empty State / Creation card displayed at the bottom or when list is empty */}
+      <div className="empty-playlists-box">
+        <div className="empty-playlists-box__inner">
+          <div className="empty-playlists-note-icon">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+          </div>
+          <h2>No playlists yet!</h2>
+          <p>Create your first playlist and it will show up here.</p>
+          <button 
+            className="purple-create-btn"
+            onClick={handleCreatePlaylist}
+          >
+            <Plus size={16} /> Create Playlist
+          </button>
+        </div>
       </div>
     </div>
   );
