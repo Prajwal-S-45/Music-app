@@ -1,0 +1,213 @@
+.coming-soon-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 80vh;
+  padding: 2rem;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.coming-soon-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #b3b3b3;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  margin-bottom: 2rem;
+  z-index: 10;
+}
+
+.coming-soon-back-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  transform: translateX(-3px);
+}
+
+.coming-soon-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rem;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Left side: Graphic */
+.coming-soon-graphic-section {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.coming-soon-image-glow-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: csFloat 6s ease-in-out infinite;
+}
+
+.coming-soon-image {
+  max-width: 100%;
+  width: 360px;
+  height: auto;
+  object-fit: contain;
+  border-radius: 16px;
+  z-index: 2;
+  position: relative;
+}
+
+.coming-soon-glow-effect {
+  position: absolute;
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(0, 0, 0, 0) 70%);
+  border-radius: 50%;
+  filter: blur(20px);
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: csPulseGlow 4s ease-in-out infinite alternate;
+}
+
+/* Right side: Info */
+.coming-soon-info-section {
+  flex: 1.2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  z-index: 2;
+}
+
+.coming-soon-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #a78bfa;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+}
+
+.coming-soon-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0 0 1rem 0;
+  background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.coming-soon-desc {
+  font-size: 1.1rem;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin: 0 0 2rem 0;
+}
+
+.coming-soon-notify-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: #6d28d9;
+  color: #ffffff;
+  border: none;
+  padding: 0.85rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(109, 40, 217, 0.4);
+}
+
+.coming-soon-notify-btn:hover {
+  background: #7c3aed;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(124, 58, 237, 0.5);
+}
+
+.coming-soon-notify-btn:active {
+  transform: translateY(0);
+}
+
+.coming-soon-notify-btn.subscribed {
+  background: rgba(255, 255, 255, 0.1);
+  color: #a78bfa;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  box-shadow: none;
+}
+
+.coming-soon-notify-btn.subscribed:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: none;
+}
+
+.coming-soon-subtext {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-top: 1rem;
+}
+
+/* Animations */
+@keyframes csFloat {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes csPulseGlow {
+  0% {
+    transform: translate(-50%, -50%) scale(0.9);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .coming-soon-content {
+    flex-direction: column;
+    gap: 2.5rem;
+    text-align: center;
+  }
+
+  .coming-soon-info-section {
+    align-items: center;
+    text-align: center;
+  }
+
+  .coming-soon-image {
+    width: 280px;
+  }
+
+  .coming-soon-title {
+    font-size: 2rem;
+  }
+}
