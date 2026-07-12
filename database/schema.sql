@@ -105,3 +105,66 @@ INSERT INTO songs (title, artist, album, duration) VALUES
 ('Song Three', 'Artist C', 'Album 1', 195),
 ('Song Four', 'Artist A', 'Album 3', 165),
 ('Song Five', 'Artist D', 'Album 4', 200);
+
+-- === JIOSAAVN METADATA LAYER ===
+
+CREATE TABLE IF NOT EXISTS artists (
+  id VARCHAR(255) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  country VARCHAR(50),
+  type VARCHAR(50),
+  begin_date VARCHAR(20),
+  genre VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS artist_images (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  artist_id VARCHAR(255) NOT NULL,
+  thumbnail TEXT,
+  banner TEXT,
+  fanart TEXT,
+  logo TEXT,
+  wide_thumb TEXT,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS artist_biographies (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  artist_id VARCHAR(255) NOT NULL,
+  biography TEXT,
+  listeners INT DEFAULT 0,
+  playcount INT DEFAULT 0,
+  last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS albums (
+  id VARCHAR(255) PRIMARY KEY,
+  artist_id VARCHAR(255) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  release_date VARCHAR(20),
+  album_type VARCHAR(50),
+  thumbnail TEXT,
+  FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS tracks (
+  id VARCHAR(255) PRIMARY KEY,
+  album_id VARCHAR(255),
+  title VARCHAR(255) NOT NULL,
+  duration INT DEFAULT 0,
+  FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE IF NOT EXISTS lyrics (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  track_id VARCHAR(255) NOT NULL,
+  lyrics TEXT,
+  synced_lyrics JSON,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+);
