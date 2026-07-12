@@ -2,7 +2,7 @@
 
 ## Overview
 
-Music App is a full-stack music streaming web application. It combines a React/Vite frontend with a Node.js/Express backend, MySQL persistence, YouTube-powered music discovery, and Socket.IO real-time shared listening rooms.
+Music App is a full-stack music streaming web application. It combines a React/Vite frontend with a Node.js/Express backend, MySQL persistence, JioSaavn-powered music discovery, and Socket.IO real-time shared listening rooms.
 
 The main user flow is:
 
@@ -20,7 +20,7 @@ The project includes the core application layers needed for local development:
 - Backend REST API for users, music, playlists, likes, and rooms
 - Socket.IO server for real-time listening room sync
 - MySQL schema for users, songs, playlists, likes, and listening rooms
-- YouTube Data API integration for search, trending music, artwork, and metadata
+- JioSaavn unofficial API integration for search, trending music, artwork, and metadata
 - Local setup documentation in `README.md`
 - API details in `API_REFERENCE.md`
 
@@ -29,7 +29,7 @@ The project includes the core application layers needed for local development:
 | Area | Implemented |
 | --- | --- |
 | Authentication | Signup, login, JWT token handling, profile endpoint |
-| Music Discovery | YouTube search, trending music, artist/cache endpoints |
+| Music Discovery | JioSaavn search, trending music, artist/cache endpoints |
 | Playback | Player UI, queue support, external stream/player components |
 | Likes | Like, unlike, and list liked songs |
 | Playlists | Create playlists, add songs, remove songs, list playlist songs |
@@ -53,9 +53,9 @@ Backend Express app
 Controllers and services
   |
   | MySQL queries
-  | YouTube Data API requests
+  | JioSaavn unofficial API requests
   v
-MySQL database and YouTube API
+MySQL database and JioSaavn API
 ```
 
 ## Frontend Summary
@@ -113,7 +113,7 @@ Important files and folders:
 - `backend/controllers/` - API request logic
 - `backend/models/` - database model helpers
 - `backend/middleware/auth.js` - JWT authentication middleware
-- `backend/services/youtubeService.js` - YouTube API integration
+- `backend/services/jiosaavnService.js` - JioSaavn API integration
 - `backend/services/roomStore.js` - in-memory room state
 - `backend/services/schemaMigrations.js` - startup schema compatibility checks
 - `backend/.env.example` - environment variable template
@@ -146,7 +146,7 @@ Main tables:
 - `listening_rooms`
 - `listening_room_members`
 
-The schema includes a few sample local songs. YouTube-powered search and trending results require `YOUTUBE_API_KEY` in `backend/.env`.
+The schema includes a few sample local songs. JioSaavn-powered search and trending results require `YOUTUBE_API_KEY` in `backend/.env`.
 
 ## API Summary
 
@@ -159,7 +159,7 @@ http://localhost:5000/api
 Main route groups:
 
 - `/users` - signup, login, profile
-- `/search`, `/trending`, `/artists`, `/cache/stats` - YouTube-backed discovery endpoints
+- `/search`, `/trending`, `/artists`, `/cache/stats` - JioSaavn-backed discovery endpoints
 - `/music` - music namespace routes, likes, artwork, local songs
 - `/playlists` - playlist CRUD-style operations
 - `/rooms` - shared listening room REST operations
@@ -174,14 +174,14 @@ Planned or possible improvements for the next versions:
 - AI-based music recommendations based on liked songs, playlist history, recently played tracks, and search behavior
 - Personalized home page sections such as "Because you liked this artist", "More like this playlist", and "Recommended for your mood"
 - Smart playlist generation from prompts, genres, artists, languages, or listening activity
-- Similar-song discovery using track metadata, artist overlap, genre tags, tempo, and YouTube metadata
+- Similar-song discovery using track metadata, artist overlap, genre tags, tempo, and JioSaavn metadata
 - Collaborative filtering so users with similar listening patterns can receive better recommendations
 - Mood-based recommendations for workout, focus, travel, relaxing, party, and late-night listening
 - AI-assisted search that understands natural language queries such as "sad Hindi songs from the 2010s" or "upbeat songs like this"
 - Automatic playlist descriptions, titles, and cover suggestions
 - Listening analytics dashboard for top artists, favorite genres, replayed songs, and weekly listening trends
 - Recommendation feedback controls such as "show more like this", "not interested", and "hide this artist"
-- Better caching for YouTube metadata and recommendation results to reduce API calls
+- Better caching for JioSaavn metadata and recommendation results to reduce API calls
 - Admin dashboard for monitoring users, API usage, popular songs, and system health
 - Deployment setup with production database, environment management, HTTPS, logging, and rate limiting
 
@@ -190,7 +190,7 @@ Planned or possible improvements for the next versions:
 A practical recommendation system can be added in stages:
 
 1. Start with rule-based recommendations using liked songs, playlists, and recently played tracks.
-2. Add content-based recommendations using song title, artist, channel, tags, and YouTube metadata.
+2. Add content-based recommendations using song title, artist, channel, tags, and JioSaavn metadata.
 3. Store user interaction events such as play, like, skip, search, playlist add, and repeat count.
 4. Build recommendation endpoints in the backend, for example `/api/recommendations`.
 5. Add frontend sections for personalized recommendations on the home, search, and library pages.
@@ -222,7 +222,7 @@ DB_NAME=music_app
 JWT_SECRET=change_this_to_a_secure_secret
 ADMIN_EMAILS=admin@example.com
 NODE_ENV=development
-YOUTUBE_API_KEY=your_youtube_data_api_key_here
+# No external API key is required; playback uses the JioSaavn unofficial API
 ```
 
 Optional values:
@@ -290,4 +290,4 @@ Before using this app outside local development:
 - Configure production CORS origins with `FRONTEND_URL`.
 - Add rate limiting and request logging.
 - Use a managed database or production MySQL instance.
-- Review YouTube API quota limits.
+- Review JioSaavn API quota limits.
