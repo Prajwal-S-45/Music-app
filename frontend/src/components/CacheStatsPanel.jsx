@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import apiClient from '../api/client';
 
 const POLL_INTERVAL_MS = 8000;
@@ -37,7 +37,7 @@ function CacheStatsPanel() {
       setStats(response.data?.cache || null);
       setErrorMessage('');
       setLastUpdatedAt(new Date());
-    } catch (error) {
+    } catch {
       setErrorMessage('Could not load cache metrics.');
     } finally {
       setIsLoading(false);
