@@ -30,7 +30,7 @@ Body:
 ### GET /users/profile
 Protected.
 
-## YouTube Music Endpoints
+## JioSaavn Music Endpoints
 
 ### GET /search
 Primary search endpoint.
@@ -42,7 +42,7 @@ Query params:
 Response:
 {
   "success": true,
-  "source": "youtube",
+  "source": "jiosaavn",
   "query": "arijit singh",
   "total": 3,
   "data": [
@@ -53,7 +53,7 @@ Response:
       "thumbnail": "https://...",
       "channelTitle": "Channel",
       "publishedAt": "2024-01-01T00:00:00Z",
-      "source": "youtube",
+      "source": "jiosaavn",
       "playable": true
     }
   ]
@@ -66,7 +66,7 @@ Query params:
 - limit (optional, default 12, max 25)
 
 Notes:
-- Uses YouTube mostPopular music category for region IN.
+- Uses JioSaavn mostPopular music category for region IN.
 - Applies filtering to reduce covers/remixes/shorts noise.
 
 ### GET /music/search
@@ -80,7 +80,7 @@ Query params:
 Alias endpoint under music namespace.
 
 ### GET /music/search/all
-Backward-compatible alias that maps to YouTube search.
+Backward-compatible alias that maps to JioSaavn search.
 
 Query params:
 - query or q
@@ -108,7 +108,7 @@ Protected.
 
 ### GET /music/liked
 Protected.
-Returns liked songs with YouTube metadata when available.
+Returns liked songs with JioSaavn metadata when available.
 
 ## Playlist Endpoints
 
@@ -141,7 +141,7 @@ Body:
 
 ### GET /playlists/:playlistId/songs
 Protected.
-Returns playlist songs resolved from YouTube metadata where possible.
+Returns playlist songs resolved from JioSaavn metadata where possible.
 
 ## Health Endpoint
 
@@ -149,7 +149,7 @@ Returns playlist songs resolved from YouTube metadata where possible.
 Response:
 {
   "status": "Server is running",
-  "youtubeConfigured": true
+  "jiosaavnConfigured": true
 }
 
 ## Environment Variables (Backend)
