@@ -159,7 +159,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
     const run = async () => {
       try {
         const movieName = extractMovieName(decodedAlbum);
-        // Clean query — youtubeService already appends "official audio video"
+        // Clean query — jiosaavnService already appends "official audio video"
         const albumSearch = movieName || decodedAlbum;
         const searchQueryStr = `${albumSearch} movie songs`;
 
@@ -224,7 +224,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
               videoId: s.videoId || s.id,
               cover: s.thumbnail || s.cover || '',
               artist: s.channelTitle || s.artist || decodedArtist,
-              source: 'youtube',
+              source: 'jiosaavn',
               playable: Boolean(s.videoId || s.id),
             }))
             .filter(s => {
@@ -303,7 +303,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
         videoId: s.videoId || s.id,
         cover: s.thumbnail || s.cover || '',
         artist: s.channelTitle || s.artist || decodedArtist,
-        source: 'youtube',
+        source: 'jiosaavn',
         playable: Boolean(s.videoId || s.id),
       })).filter(s => s.playable);
       if (songs.length && onPlayTrack) {
