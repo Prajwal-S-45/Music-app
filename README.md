@@ -2,12 +2,12 @@
 
 A full-stack music streaming web app built with React, Vite, Node.js, Express, Socket.IO, and MySQL.
 
-The app lets users sign up, search YouTube-powered music results, play tracks, like songs, manage playlists, and join shared listening rooms with real-time playback sync.
+The app lets users sign up, search JioSaavn-powered music results, play tracks, like songs, manage playlists, and join shared listening rooms with real-time playback sync.
 
 ## Features
 
 - User signup, login, and JWT-based authentication
-- YouTube music search and trending music endpoints
+- JioSaavn music search and trending music endpoints
 - Music player with queue support
 - Liked songs library
 - Playlist creation and song management
@@ -35,7 +35,7 @@ The app lets users sign up, search YouTube-powered music results, play tracks, l
 - Socket.IO
 - JWT authentication
 - bcryptjs password hashing
-- YouTube Data API integration
+- JioSaavn unofficial API integration
 
 **Database**
 
@@ -52,7 +52,7 @@ Music-app/
 |   |-- middleware/          # Auth/admin middleware
 |   |-- models/              # Database access helpers
 |   |-- routes/              # Express route definitions
-|   |-- services/            # YouTube, room store, schema migration logic
+|   |-- services/            # JioSaavn, room store, schema migration logic
 |   |-- uploads/             # Local uploaded/static files
 |   |-- server.js            # Express and Socket.IO entry point
 |   |-- .env.example         # Backend environment template
@@ -86,7 +86,7 @@ Install these before running the project:
 - Node.js 18 or newer
 - npm
 - MySQL server
-- YouTube Data API v3 key
+- JioSaavn unofficial API access
 
 ## Setup
 
@@ -131,7 +131,7 @@ DB_NAME=music_app
 JWT_SECRET=change_this_to_a_secure_secret
 ADMIN_EMAILS=admin@example.com
 NODE_ENV=development
-YOUTUBE_API_KEY=your_youtube_data_api_key_here
+# No external API key is required; playback uses the JioSaavn unofficial API
 ```
 
 Optional backend variables:
@@ -203,9 +203,9 @@ http://localhost:5000/api
 - `POST /users/login` - login and receive a JWT token
 - `GET /users/profile` - get the logged-in user profile
 
-### Music and YouTube
+### Music and JioSaavn
 
-- `GET /search?q=term` - search YouTube music
+- `GET /search?q=term` - search JioSaavn music
 - `GET /trending` - get trending music
 - `GET /artists` - get artist data
 - `GET /cache/stats` - get backend cache stats
@@ -290,7 +290,7 @@ npm run preview  # preview production build
 **Search or trending endpoints fail**
 
 - Make sure `YOUTUBE_API_KEY` is set in `backend/.env`.
-- Confirm the key has access to YouTube Data API v3.
+- Confirm the key has access to JioSaavn Data API v3.
 
 **Frontend cannot reach backend**
 
@@ -307,5 +307,5 @@ npm run preview  # preview production build
 
 - Do not commit real `.env` secrets.
 - Change `JWT_SECRET` before using the app outside local development.
-- The app stores YouTube video IDs as song IDs for external music results.
-- `database/schema.sql` includes sample local songs, but YouTube search requires an API key.
+- The app stores JioSaavn video IDs as song IDs for external music results.
+- `database/schema.sql` includes sample local songs, but JioSaavn search requires an API key.
