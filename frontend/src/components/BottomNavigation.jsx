@@ -30,10 +30,13 @@ function BottomNavigation() {
         <span>Library</span>
       </NavLink>
 
-      <div className="bottom-nav-item premium-link">
+      <NavLink 
+        to="/premium" 
+        className={({ isActive }) => `bottom-nav-item premium-link ${isActive ? 'active' : ''}`}
+      >
         <Crown size={24} />
         <span>Premium</span>
-      </div>
+      </NavLink>
     </nav>
   );
 }
