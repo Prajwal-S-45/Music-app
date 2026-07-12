@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Search } from 'lucide-react';
 import apiClient from '../api/client';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=500&q=80';
@@ -35,27 +36,40 @@ const normalizeArtist = (artist, index) => {
   };
 };
 
-function cacheKey(query, token) {
-  return `${normalizeText(query).toLowerCase()}::${String(token || '')}`;
+function cacheKey(query, token, language) {
+  return `${normalizeText(query).toLowerCase()}::${String(token || '')}::${String(language || '').toLowerCase()}`;
 }
 
-function readCache(query, token) {
-  const entry = pageCache.get(cacheKey(query, token));
+function readCache(query, token, language) {
+  const entry = pageCache.get(cacheKey(query, token, language));
   if (!entry || entry.expiresAt <= Date.now()) {
     return null;
   }
-
   return entry;
 }
 
-function writeCache(query, token, payload) {
-  pageCache.set(cacheKey(query, token), {
+function writeCache(query, token, language, payload) {
+  pageCache.set(cacheKey(query, token, language), {
     expiresAt: Date.now() + CACHE_TTL_MS,
     ...payload,
   });
 }
 
 const ArtistCard = React.memo(function ArtistCard({ artist, onClick }) {
+  const [imageUrl, setImageUrl] = useState(artist.thumbnail || FALLBACK_IMAGE);
+
+  useEffect(() => {
+    let mounted = true;
+    apiClient.get(`/api/music/artist-image?name=${encodeURIComponent(artist.name)}`)
+      .then(res => {
+        if (mounted && res.data?.url) {
+          setImageUrl(res.data.url);
+        }
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [artist.name]);
+
   return (
     <button
       type="button"
@@ -64,10 +78,14 @@ const ArtistCard = React.memo(function ArtistCard({ artist, onClick }) {
     >
       <span className="artists-page__image-wrap">
         <img
-          src={artist.thumbnail || FALLBACK_IMAGE}
+          src={imageUrl}
           alt={artist.name}
           loading="lazy"
           className="artists-page__image"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = FALLBACK_IMAGE;
+          }}
         />
       </span>
       <span className="artists-page__name">{artist.name}</span>
@@ -76,7 +94,7 @@ const ArtistCard = React.memo(function ArtistCard({ artist, onClick }) {
   );
 });
 
-function ArtistsPage({ embedded = false }) {
+function ArtistsPage({ embedded = false, user }) {
   const navigate = useNavigate();
   const [artists, setArtists] = useState([]);
   const [inputValue, setInputValue] = useState('');
@@ -100,7 +118,7 @@ function ArtistsPage({ embedded = false }) {
     let mounted = true;
 
     const loadArtists = async () => {
-      const cached = readCache(debouncedQuery, '');
+      const cached = readCache(debouncedQuery, '', languageFilter);
       if (cached) {
         setArtists(cached.items);
         setNextPageToken(cached.nextPageToken || '');
@@ -114,6 +132,7 @@ function ArtistsPage({ embedded = false }) {
           params: {
             limit: PAGE_SIZE,
             ...(debouncedQuery ? { q: debouncedQuery } : {}),
+            ...(languageFilter ? { language: languageFilter } : {}),
           },
         });
 
@@ -124,7 +143,7 @@ function ArtistsPage({ embedded = false }) {
         })).values());
 
         const token = String(response.data?.nextPageToken || '');
-        writeCache(debouncedQuery, '', { items: normalized, nextPageToken: token });
+        writeCache(debouncedQuery, '', languageFilter, { items: normalized, nextPageToken: token });
         if (mounted) {
           setArtists(normalized);
           setNextPageToken(token);
@@ -146,7 +165,7 @@ function ArtistsPage({ embedded = false }) {
     return () => {
       mounted = false;
     };
-  }, [debouncedQuery]);
+  }, [debouncedQuery, languageFilter]);
 
   useEffect(() => {
     if (!sentinelRef.current || !nextPageToken || isLoading || isLoadingMore) {
@@ -166,23 +185,21 @@ function ArtistsPage({ embedded = false }) {
     return () => observer.disconnect();
   }, [nextPageToken, isLoading, isLoadingMore]);
 
+  // Frontend filter just for search box if debounced query hasn't updated yet,
+  // but server handles the actual language filtering.
   const filteredArtists = useMemo(() => {
     const normalized = normalizeText(inputValue).toLowerCase();
-    const language = normalizeText(languageFilter).toLowerCase();
-
     return artists.filter((artist) => {
-      const matchesSearch = !normalized || artist.name.toLowerCase().includes(normalized);
-      const matchesLanguage = !language || normalizeText(artist.language).toLowerCase() === language;
-      return matchesSearch && matchesLanguage;
+      return !normalized || artist.name.toLowerCase().includes(normalized);
     });
-  }, [artists, inputValue, languageFilter]);
+  }, [artists, inputValue]);
 
   const loadMore = useCallback(async () => {
     if (!nextPageToken || isLoading || isLoadingMore) {
       return;
     }
 
-    const cached = readCache(debouncedQuery, nextPageToken);
+    const cached = readCache(debouncedQuery, nextPageToken, languageFilter);
     if (cached) {
       setArtists((current) => {
         const merged = [...current, ...cached.items];
@@ -199,6 +216,7 @@ function ArtistsPage({ embedded = false }) {
         params: {
           limit: PAGE_SIZE,
           ...(debouncedQuery ? { q: debouncedQuery } : {}),
+          ...(languageFilter ? { language: languageFilter } : {}),
           pageToken: nextPageToken,
         },
       });
@@ -210,7 +228,7 @@ function ArtistsPage({ embedded = false }) {
       })).values());
 
       const token = String(response.data?.nextPageToken || '');
-      writeCache(debouncedQuery, nextPageToken, { items: normalized, nextPageToken: token });
+      writeCache(debouncedQuery, nextPageToken, languageFilter, { items: normalized, nextPageToken: token });
       setArtists((current) => {
         const merged = [...current, ...normalized];
         return Array.from(new Map(merged.map((artist) => [artist.id, artist])).values());
@@ -221,7 +239,7 @@ function ArtistsPage({ embedded = false }) {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [debouncedQuery, isLoading, isLoadingMore, nextPageToken]);
+  }, [debouncedQuery, languageFilter, isLoading, isLoadingMore, nextPageToken]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -234,6 +252,25 @@ function ArtistsPage({ embedded = false }) {
 
   return (
     <div className={`artists-page ${embedded ? 'artists-page--embedded' : ''}`}>
+      {!embedded && (
+        <div className="library-mobile-header">
+          <div className="library-mobile-header-top">
+            <div className="library-profile-btn" onClick={() => navigate('/profile')}>
+              {user?.name ? user.name.charAt(0).toUpperCase() : 'P'}
+            </div>
+            <span className="library-title">Your Library</span>
+            <div className="library-actions">
+              <button aria-label="Search Library">
+                <Search size={20} />
+              </button>
+            </div>
+          </div>
+          <div className="library-mobile-pills">
+            <button onClick={() => navigate('/library')}>Playlists</button>
+            <button className="active" onClick={() => navigate('/artists')}>Artists</button>
+          </div>
+        </div>
+      )}
       <section className="artists-page__hero">
         <div>
           <p className="artists-page__eyebrow">Artists</p>
