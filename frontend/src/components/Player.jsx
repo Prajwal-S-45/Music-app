@@ -1,38 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import useSocketRoom from '../hooks/useSocketRoom';
+import { getPlaybackStreamUrl } from '../api/musicApi';
 import { buildSongLikePayload } from '../utils/songPayload';
 import '../styles/Player.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-let ytApiPromise = null;
-
-const loadYouTubeApi = () => {
-  if (window.YT?.Player) {
-    return Promise.resolve(window.YT);
-  }
-
-  if (ytApiPromise) {
-    return ytApiPromise;
-  }
-
-  ytApiPromise = new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
-    script.async = true;
-    document.body.appendChild(script);
-
-    const previousHandler = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      if (typeof previousHandler === 'function') {
-        previousHandler();
-      }
-      resolve(window.YT);
-    };
-  });
-
-  return ytApiPromise;
-};
 
 const normalizeSongList = (payload) => {
   if (Array.isArray(payload?.data)) {
@@ -46,43 +19,6 @@ const normalizeSongList = (payload) => {
   return [];
 };
 
-const getVideoIdFromUrl = (value) => {
-  const rawUrl = String(value || '').trim();
-  if (!rawUrl) {
-    return '';
-  }
-
-  try {
-    const parsed = new URL(rawUrl);
-    if (parsed.hostname.includes('youtu.be')) {
-      return parsed.pathname.replace('/', '').trim();
-    }
-
-    if (parsed.hostname.includes('youtube.com')) {
-      return (parsed.searchParams.get('v') || '').trim();
-    }
-  } catch {
-    return '';
-  }
-
-  return '';
-};
-
-const resolveVideoId = (song) => {
-  const explicitId = String(song?.videoId || '').trim();
-  if (explicitId) {
-    return explicitId;
-  }
-
-  const idAsVideo = song?.source === 'youtube' ? String(song?.id || '').trim() : '';
-  if (idAsVideo) {
-    return idAsVideo;
-  }
-
-  return getVideoIdFromUrl(song?.file_url);
-};
-
-const isYouTubeSong = (song) => Boolean(resolveVideoId(song));
 
 function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
   const [songs, setSongs] = useState([]);
@@ -105,8 +41,6 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
   } = useSocketRoom();
 
   const audioRef = useRef(null);
-  const ytContainerRef = useRef(null);
-  const ytPlayerRef = useRef(null);
   const joinedRoomIdRef = useRef('');
   const currentSongRef = useRef(null);
   const isPlayingRef = useRef(false);
@@ -134,13 +68,6 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
     currentTimeSyncRef.current = audioRef.current?.currentTime || 0;
   }, [currentSong, isPlaying]);
 
-  useEffect(() => {
-    return () => {
-      if (ytPlayerRef.current?.destroy) {
-        ytPlayerRef.current.destroy();
-      }
-    };
-  }, []);
 
   useEffect(() => {
     fetchSongs();
@@ -380,13 +307,14 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
 
   const setAudioSourceAndTime = (song, startTime = 0) => {
     const audio = audioRef.current;
-    if (!audio || !song?.file_url) {
+    const sourceUrl = song?.streamUrl || song?.file_url || '';
+    if (!audio || !sourceUrl) {
       return;
     }
 
-    const normalizedUrl = song.file_url.startsWith('http')
-      ? song.file_url
-      : `${API_URL}${song.file_url}`;
+    const normalizedUrl = sourceUrl.startsWith('http')
+      ? sourceUrl
+      : `${API_URL}${sourceUrl}`;
 
     const safeTime = Number.isFinite(Number(startTime)) && Number(startTime) >= 0 ? Number(startTime) : 0;
 
@@ -410,93 +338,33 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
     };
   };
 
-  const getCurrentPlaybackTime = () => {
-    if (isYouTubeSong(currentSongRef.current) && ytPlayerRef.current?.getCurrentTime) {
-      return Number(ytPlayerRef.current.getCurrentTime() || 0);
+  const getCurrentPlaybackTime = () => Number(audioRef.current?.currentTime || 0);
+
+  const resolvePlayableSong = async (song) => {
+    const songId = song?.id || song?.songId;
+    if (songId) {
+      const streamUrl = getPlaybackStreamUrl(songId, song?.streamUrl || song?.file_url || '');
+      return { ...song, streamUrl, file_url: streamUrl, source: song.source || 'jiosaavn' };
     }
 
-    return Number(audioRef.current?.currentTime || 0);
-  };
-
-  const setYouTubeSourceAndTime = async (song, startTime = 0, shouldPlay = true) => {
-    const videoId = resolveVideoId(song);
-    if (!videoId || !ytContainerRef.current) {
-      return false;
+    const sourceUrl = song?.streamUrl || song?.file_url || '';
+    if (sourceUrl) {
+      return { ...song, streamUrl: sourceUrl, file_url: sourceUrl, source: song.source || 'jiosaavn' };
     }
 
-    const safeTime = Number.isFinite(Number(startTime)) && Number(startTime) >= 0 ? Number(startTime) : 0;
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-
-    const YT = await loadYouTubeApi();
-
-    if (!ytPlayerRef.current) {
-      ytPlayerRef.current = new YT.Player(ytContainerRef.current, {
-        host: 'https://www.youtube.com',
-        width: '1',
-        height: '1',
-        videoId,
-        playerVars: {
-          autoplay: 0,
-          controls: 0,
-          rel: 0,
-          modestbranding: 1,
-          enablejsapi: 1,
-          origin: window.location.origin,
-        },
-        events: {
-          onStateChange: (event) => {
-            const state = event?.data;
-
-            if (state === YT.PlayerState.PLAYING) {
-              setIsPlaying(true);
-            } else if (state === YT.PlayerState.PAUSED) {
-              setIsPlaying(false);
-            } else if (state === YT.PlayerState.ENDED) {
-              setIsPlaying(false);
-              playNextFromQueue();
-            }
-          },
-        },
-      });
-    }
-
-    if (shouldPlay) {
-      ytPlayerRef.current.loadVideoById({
-        videoId,
-        startSeconds: safeTime,
-      });
-      ytPlayerRef.current.playVideo?.();
-      return true;
-    }
-
-    ytPlayerRef.current.cueVideoById({
-      videoId,
-      startSeconds: safeTime,
-    });
-    return true;
+    throw new Error('Song ID is required for playback');
   };
 
   const setMediaSourceAndTime = async (song, startTime = 0, shouldPlay = true) => {
-    if (isYouTubeSong(song)) {
-      return setYouTubeSourceAndTime(song, startTime, shouldPlay);
-    }
-
-    if (ytPlayerRef.current?.stopVideo) {
-      ytPlayerRef.current.stopVideo();
-    }
-
-    setAudioSourceAndTime(song, startTime);
+    const playableSong = await resolvePlayableSong(song);
+    setAudioSourceAndTime(playableSong, startTime);
 
     if (shouldPlay && audioRef.current) {
       await audioRef.current.play();
     }
 
-    return true;
+    return playableSong;
   };
-
   const syncRemotePlayback = ({ type, currentSong, isPlaying: nextPlaying, currentTime = 0, serverTime }) => {
     if (!currentSong) {
       return;
@@ -514,9 +382,7 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
     } else {
       const drift = Math.abs(getCurrentPlaybackTime() - safeTime);
       if (drift > 0.35 || type === 'seek' || type === 'change_song') {
-        if (isYouTubeSong(currentSongRef.current) && ytPlayerRef.current?.seekTo) {
-          ytPlayerRef.current.seekTo(safeTime, true);
-        } else if (audioRef.current) {
+        if (audioRef.current) {
           try {
             audioRef.current.currentTime = safeTime;
           } catch {
@@ -533,36 +399,26 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
     }
 
     if (nextPlaying) {
-      if (isYouTubeSong(currentSongRef.current) && ytPlayerRef.current?.playVideo) {
-        ytPlayerRef.current.playVideo();
-      } else {
-        audioRef.current?.play().catch(() => {
-          setMessage(`Unable to sync ${currentSong.title}.`);
-        });
-      }
+      audioRef.current?.play().catch(() => {
+        setMessage(`Unable to sync ${currentSong.title}.`);
+      });
     } else {
-      if (isYouTubeSong(currentSongRef.current) && ytPlayerRef.current?.pauseVideo) {
-        ytPlayerRef.current.pauseVideo();
-      } else {
-        audioRef.current?.pause();
-      }
+      audioRef.current?.pause();
     }
   };
 
   const playSong = (song, options = {}) => {
     const { broadcast = true, startTime = 0 } = options;
 
-    if (!song.file_url && !isYouTubeSong(song)) {
-      setMessage(`No playable source configured for ${song.title}`);
-      return;
-    }
-
     setCurrentSong(song);
     setIsPlaying(true);
     setMessage('');
-    setMediaSourceAndTime(song, startTime, true).catch(() => {
-      setMessage(`Unable to play ${song.title}.`);
-    });
+    setMediaSourceAndTime(song, startTime, true)
+      .then((playableSong) => setCurrentSong(playableSong))
+      .catch(() => {
+        setIsPlaying(false);
+        setMessage(`Unable to play ${song.title}.`);
+      });
 
     if (broadcast && joinedRoomId && socket) {
       emitEvent('change_song', {
@@ -630,9 +486,7 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
 
   const pausePlayback = (broadcast = true) => {
     setIsPlaying(false);
-    if (isYouTubeSong(currentSongRef.current) && ytPlayerRef.current?.pauseVideo) {
-      ytPlayerRef.current.pauseVideo();
-    } else if (audioRef.current) {
+    if (audioRef.current) {
       audioRef.current.pause();
     }
 
@@ -651,11 +505,7 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
     }
 
     try {
-      if (isYouTubeSong(currentSong)) {
-        ytPlayerRef.current?.playVideo?.();
-      } else {
-        await audioRef.current?.play();
-      }
+      await audioRef.current?.play();
 
       setIsPlaying(true);
       if (joinedRoomId && socket) {
@@ -836,7 +686,6 @@ function Player({ token, user, activeTrack, queuedTrack, onLikeUpdate }) {
 
       {message && <div className="player-note">{message}</div>}
 
-      <div ref={ytContainerRef} style={{ width: 1, height: 1, position: 'absolute', left: -9999, top: -9999 }} />
 
       <audio ref={audioRef} onEnded={playNextFromQueue} onSeeked={handleAudioSeeked} />
 
