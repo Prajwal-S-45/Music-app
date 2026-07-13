@@ -24,6 +24,7 @@ import {
   Check,
 } from 'lucide-react';
 import apiClient from '../api/client';
+import { getPlaybackStreamUrl } from '../api/musicApi';
 import { buildSongLikePayload } from '../utils/songPayload';
 import NowPlayingScreen from './NowPlayingScreen';
 import { saveQueueToLibrary } from '../utils/savedQueues';
@@ -34,34 +35,6 @@ const FALLBACK_IMAGE =
 
 import { cleanSongTitle, getSongMetadata, extractMovieOrAlbum } from '../utils/songMetadata';
 
-let ytApiPromise = null;
-
-const loadYouTubeApi = () => {
-  if (window.YT?.Player) {
-    return Promise.resolve(window.YT);
-  }
-
-  if (ytApiPromise) {
-    return ytApiPromise;
-  }
-
-  ytApiPromise = new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
-    script.async = true;
-    document.body.appendChild(script);
-
-    const previousHandler = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      if (typeof previousHandler === 'function') {
-        previousHandler();
-      }
-      resolve(window.YT);
-    };
-  });
-
-  return ytApiPromise;
-};
 
 const formatTime = (seconds) => {
   const value = Number(seconds) || 0;
@@ -117,8 +90,6 @@ function PlayerBar({
   onClearQueue,
 }) {
   const audioRef = useRef(null);
-  const ytContainerRef = useRef(null);
-  const ytPlayerRef = useRef(null);
   const nextTrackHandlerRef = useRef(null);
   const repeatRef = useRef(false);
   const progressTimerRef = useRef(null);
@@ -134,8 +105,10 @@ function PlayerBar({
   const [showMobileQueue, setShowMobileQueue] = useState(false);
   const [mobileQueueTab, setMobileQueueTab] = useState('UP NEXT'); // 'UP NEXT' or 'LYRICS'
 
-  const activeTrackId = track?.videoId || track?.id;
-  const isYouTubeTrack = Boolean(track?.videoId || (!track?.streamUrl && track?.source === 'youtube'));
+  const activeTrackId = track?.id || track?.songId;
+  const directStreamUrl = track?.streamUrl || track?.file_url || '';
+  const backendStreamUrl = activeTrackId ? getPlaybackStreamUrl(activeTrackId, directStreamUrl) : '';
+  const resolvedStreamUrl = backendStreamUrl || directStreamUrl;
 
   const resolvedAlbumName = useMemo(() => {
     if (!track) return 'Single';
@@ -227,17 +200,12 @@ function PlayerBar({
     stopProgressTimer();
 
     progressTimerRef.current = window.setInterval(() => {
-      if (isYouTubeTrack && ytPlayerRef.current) {
-        setCurrentTime(ytPlayerRef.current.getCurrentTime?.() || 0);
-        setDuration(ytPlayerRef.current.getDuration?.() || 0);
-      }
-
-      if (!isYouTubeTrack && audioRef.current) {
+      if (audioRef.current) {
         setCurrentTime(audioRef.current.currentTime || 0);
         setDuration(audioRef.current.duration || 0);
       }
     }, 1000);
-  }, [isYouTubeTrack, stopProgressTimer]);
+  }, [stopProgressTimer]);
 
   const goToTrack = useCallback(
     (nextIndex) => {
@@ -280,19 +248,17 @@ function PlayerBar({
   useEffect(() => {
     return () => {
       stopProgressTimer();
-      if (ytPlayerRef.current?.destroy) {
-        ytPlayerRef.current.destroy();
-      }
     };
   }, [stopProgressTimer]);
 
+
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || isYouTubeTrack || !track?.streamUrl) {
+    if (!audio || !resolvedStreamUrl) {
       return;
     }
 
-    audio.src = track.streamUrl;
+    audio.src = resolvedStreamUrl;
     audio.load();
     setCurrentTime(0);
     setDuration(0);
@@ -301,121 +267,33 @@ function PlayerBar({
     if (track?.shouldAutoPlay) {
       audio
         .play()
-        .then(() => setIsPlaying(true))
+        .then(() => {
+          setIsPlaying(true);
+          startProgressTimer();
+        })
         .catch(() => setIsPlaying(false));
     }
-  }, [isYouTubeTrack, track?.streamUrl, track?.id, track?.requestId, track?.shouldAutoPlay]);
+  }, [resolvedStreamUrl, track?.id, track?.requestId, track?.shouldAutoPlay, startProgressTimer]);
 
-  useEffect(() => {
-    const videoId = track?.videoId || null;
-
-    if (!isYouTubeTrack || !videoId || !ytContainerRef.current) {
-      return;
-    }
-
-    let mounted = true;
-
-    const setupPlayer = async () => {
-      try {
-        const YT = await loadYouTubeApi();
-        if (!mounted || !ytContainerRef.current) {
-          return;
-        }
-
-        if (!ytPlayerRef.current) {
-          const appOrigin = window.location.origin;
-
-          const playerNode = document.createElement('div');
-          ytContainerRef.current.innerHTML = '';
-          ytContainerRef.current.appendChild(playerNode);
-
-          ytPlayerRef.current = new YT.Player(playerNode, {
-            host: 'https://www.youtube.com',
-            width: '1',
-            height: '1',
-            videoId,
-            playerVars: {
-              autoplay: 0,
-              controls: 0,
-              rel: 0,
-              modestbranding: 1,
-              enablejsapi: 1,
-              origin: appOrigin,
-            },
-            events: {
-              onReady: () => {
-                ytPlayerRef.current?.setVolume?.(Math.round(volume * 100));
-                setDuration(ytPlayerRef.current?.getDuration?.() || 0);
-              },
-              onStateChange: (event) => {
-                const state = event?.data;
-                if (state === YT.PlayerState.PLAYING) {
-                  setIsPlaying(true);
-                  startProgressTimer();
-                } else if (state === YT.PlayerState.PAUSED) {
-                  setIsPlaying(false);
-                } else if (state === YT.PlayerState.ENDED) {
-                  setIsPlaying(false);
-                  stopProgressTimer();
-                  if (repeatRef.current && ytPlayerRef.current) {
-                    ytPlayerRef.current.seekTo(0, true);
-                    ytPlayerRef.current.playVideo();
-                  } else {
-                    nextTrackHandlerRef.current?.();
-                  }
-                }
-              },
-            },
-          });
-        } else if (track?.shouldAutoPlay) {
-          ytPlayerRef.current.loadVideoById(videoId);
-        } else {
-          ytPlayerRef.current.cueVideoById(videoId);
-        }
-
-        if (track?.shouldAutoPlay) {
-          ytPlayerRef.current.playVideo?.();
-        }
-      } catch {
-        setIsPlaying(false);
-      }
-    };
-
-    setCurrentTime(0);
-    setDuration(0);
-    setupPlayer();
-
-    return () => {
-      mounted = false;
-    };
-  }, [isYouTubeTrack, track?.videoId, track?.requestId, track?.shouldAutoPlay, volume, startProgressTimer, stopProgressTimer]);
 
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
     }
 
-    if (ytPlayerRef.current?.setVolume) {
-      ytPlayerRef.current.setVolume(Math.round(volume * 100));
-    }
   }, [volume]);
 
   const handleTogglePlay = async () => {
-    if (isYouTubeTrack && ytPlayerRef.current) {
-      const playerState = ytPlayerRef.current.getPlayerState?.();
-      if (playerState === window.YT?.PlayerState?.PLAYING) {
-        ytPlayerRef.current.pauseVideo?.();
-        setIsPlaying(false);
-      } else {
-        ytPlayerRef.current.playVideo?.();
-        setIsPlaying(true);
-      }
+
+    const audio = audioRef.current;
+    if (!audio || !resolvedStreamUrl) {
       return;
     }
 
-    const audio = audioRef.current;
-    if (!audio || !track?.streamUrl) {
-      return;
+    // If audio has no src yet, set it now
+    if (!audio.src || audio.src !== resolvedStreamUrl) {
+      audio.src = resolvedStreamUrl;
+      audio.load();
     }
 
     if (isPlaying) {
@@ -427,6 +305,7 @@ function PlayerBar({
     try {
       await audio.play();
       setIsPlaying(true);
+      startProgressTimer();
     } catch {
       setIsPlaying(false);
     }
@@ -436,15 +315,11 @@ function PlayerBar({
     const timeVal = Number(nextTime) || 0;
     setCurrentTime(timeVal);
 
-    if (isYouTubeTrack && ytPlayerRef.current?.seekTo) {
-      ytPlayerRef.current.seekTo(timeVal, true);
-      return;
-    }
 
     if (audioRef.current) {
       audioRef.current.currentTime = timeVal;
     }
-  }, [isYouTubeTrack]);
+  }, []);
 
   const handleSeek = (event) => {
     handleSeekTime(Number(event.target.value));
@@ -462,16 +337,15 @@ function PlayerBar({
 
   return (
     <>
-      <div id="yt-player-container" ref={ytContainerRef} style={{ display: 'none' }}></div>
-
-      {track?.streamUrl && !isYouTubeTrack && (
+      {resolvedStreamUrl && (
         <audio
           ref={audioRef}
-          src={track.streamUrl}
+          src={resolvedStreamUrl}
           autoPlay
           onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
           onDurationChange={() => setDuration(audioRef.current?.duration || 0)}
-          onEnded={handleNext}
+          onEnded={handleAudioEnded}
+          onError={() => setIsPlaying(false)}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
         />
@@ -688,7 +562,7 @@ function PlayerBar({
                         </div>
                       ) : (
                         queue.map((item, index) => {
-                          const isTrackActive = (item.videoId || item.id) === activeTrackId;
+                          const isTrackActive = item.id === activeTrackId;
                           return (
                             <div
                               key={item.queueItemId || item.id || index}
