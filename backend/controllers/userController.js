@@ -63,3 +63,36 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.updateProfile = async (req, res) => {
+  try {
+    const { name, bio, avatar, plan } = req.body;
+    await User.updateProfile(req.userId, { name, bio, avatar, plan });
+    const updatedUser = await User.findById(req.userId);
+    res.json(updatedUser);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ error: 'Old password and new password required' });
+    }
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const fullUser = await User.findByEmail(user.email);
+    const isPasswordValid = await bcrypt.compare(oldPassword, fullUser.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Incorrect old password' });
+    }
+    await User.updatePassword(req.userId, newPassword);
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
