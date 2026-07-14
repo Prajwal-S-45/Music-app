@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Search, ArrowLeft, SlidersHorizontal, Grid, List as ListIcon, MoreVertical } from 'lucide-react';
 import apiClient from '../api/client';
+import artistsHeroBg from '../assets/artists_hero_bg.png';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=500&q=80';
 const PAGE_SIZE = 24;
@@ -22,6 +23,23 @@ const LANGUAGE_OPTIONS = [
   { value: 'English', label: 'English' },
   { value: 'Other', label: 'Other' },
 ];
+
+const getFollowerCount = (name) => {
+  if (name === 'Arijit Singh') return '12.4M';
+  if (name === 'Atif Aslam') return '9.8M';
+  if (name === 'Ed Sheeran') return '22.6M';
+  if (name === 'Shreya Ghoshal') return '11.2M';
+  if (name === 'The Weeknd') return '18.7M';
+  if (name === 'Coldplay') return '16.1M';
+
+  // Fallback hash
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const followersNum = Math.abs(hash % 90) / 10 + 1; // 1.0M to 9.9M
+  return `${followersNum.toFixed(1)}M`;
+};
 
 const normalizeText = (value) => String(value || '').trim();
 
@@ -55,8 +73,8 @@ function writeCache(query, token, language, payload) {
   });
 }
 
-const ArtistCard = React.memo(function ArtistCard({ artist, onClick }) {
-  const [imageUrl, setImageUrl] = useState(artist.thumbnail || FALLBACK_IMAGE);
+const ArtistCard = React.memo(function ArtistCard({ artist, onClick, isFollowing, onToggleFollow, viewMode = 'grid' }) {
+  const [imageUrl, setImageUrl] = useState(artist.image || artist.thumbnail || FALLBACK_IMAGE);
 
   useEffect(() => {
     let mounted = true;
@@ -70,13 +88,45 @@ const ArtistCard = React.memo(function ArtistCard({ artist, onClick }) {
     return () => { mounted = false; };
   }, [artist.name]);
 
+  const handleFollowClick = (e) => {
+    e.stopPropagation();
+    onToggleFollow(artist);
+  };
+
+  const followerCount = getFollowerCount(artist.name);
+
+  if (viewMode === 'list') {
+    return (
+      <div className="artists-page__list-row" onClick={() => onClick(artist)}>
+        <img
+          src={imageUrl}
+          alt={artist.name}
+          className="artists-page__list-img"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = FALLBACK_IMAGE;
+          }}
+        />
+        <div className="artists-page__list-info">
+          <strong>{artist.name}</strong>
+          <span>{followerCount} followers</span>
+        </div>
+        <button 
+          className={`artists-page__follow-btn ${isFollowing ? 'following' : ''}`}
+          onClick={handleFollowClick}
+        >
+          {isFollowing ? 'Following' : 'Follow'}
+        </button>
+        <button className="artists-page__more-btn" onClick={(e) => e.stopPropagation()}>
+          <MoreVertical size={18} />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <button
-      type="button"
-      className="artists-page__card"
-      onClick={() => onClick(artist)}
-    >
-      <span className="artists-page__image-wrap">
+    <div className="artists-page__card" onClick={() => onClick(artist)}>
+      <div className="artists-page__image-wrap">
         <img
           src={imageUrl}
           alt={artist.name}
@@ -87,10 +137,16 @@ const ArtistCard = React.memo(function ArtistCard({ artist, onClick }) {
             e.currentTarget.src = FALLBACK_IMAGE;
           }}
         />
-      </span>
+      </div>
       <span className="artists-page__name">{artist.name}</span>
-      <span className="artists-page__meta">{artist.language || 'Artist'}</span>
-    </button>
+      <span className="artists-page__followers">{followerCount} followers</span>
+      <button 
+        className={`artists-page__follow-btn ${isFollowing ? 'following' : ''}`}
+        onClick={handleFollowClick}
+      >
+        {isFollowing ? 'Following' : 'Follow'}
+      </button>
+    </div>
   );
 });
 
@@ -105,6 +161,58 @@ function ArtistsPage({ embedded = false, user }) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const sentinelRef = useRef(null);
+
+  // Redesign states:
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'following', 'popular', 'recent'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [sortBy, setSortBy] = useState('popular'); // 'popular' or 'az'
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
+  const [followedArtists, setFollowedArtists] = useState(() => {
+    try {
+      const saved = localStorage.getItem('music_app_followed_artists');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 900);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const toggleFollow = (artist) => {
+    const isFollowing = followedArtists.some(fa => fa.name.toLowerCase() === artist.name.toLowerCase());
+    let updated;
+    if (isFollowing) {
+      updated = followedArtists.filter(fa => fa.name.toLowerCase() !== artist.name.toLowerCase());
+    } else {
+      updated = [...followedArtists, {
+        id: artist.id,
+        name: artist.name,
+        image: artist.image,
+        role: artist.language || 'Singer'
+      }];
+    }
+    setFollowedArtists(updated);
+    localStorage.setItem('music_app_followed_artists', JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('followedArtistsUpdated'));
+  };
+
+  // Sync state if profile changes follows
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem('music_app_followed_artists');
+        setFollowedArtists(saved ? JSON.parse(saved) : []);
+      } catch {}
+    };
+    window.addEventListener('followedArtistsUpdated', handleSync);
+    return () => window.removeEventListener('followedArtistsUpdated', handleSync);
+  }, []);
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
@@ -168,7 +276,7 @@ function ArtistsPage({ embedded = false, user }) {
   }, [debouncedQuery, languageFilter]);
 
   useEffect(() => {
-    if (!sentinelRef.current || !nextPageToken || isLoading || isLoadingMore) {
+    if (!sentinelRef.current || !nextPageToken || isLoading || isLoadingMore || activeTab !== 'all') {
       return undefined;
     }
 
@@ -183,10 +291,8 @@ function ArtistsPage({ embedded = false, user }) {
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [nextPageToken, isLoading, isLoadingMore]);
+  }, [nextPageToken, isLoading, isLoadingMore, activeTab]);
 
-  // Frontend filter just for search box if debounced query hasn't updated yet,
-  // but server handles the actual language filtering.
   const filteredArtists = useMemo(() => {
     const normalized = normalizeText(inputValue).toLowerCase();
     return artists.filter((artist) => {
@@ -250,73 +356,213 @@ function ArtistsPage({ embedded = false, user }) {
     navigate(`/artist/${encodeURIComponent(artist.name)}`);
   };
 
+  const displayedArtists = useMemo(() => {
+    let list = [];
+    if (activeTab === 'following') {
+      list = followedArtists.map(fa => ({
+        id: fa.id,
+        name: fa.name,
+        image: fa.image,
+        language: fa.role || 'Artist',
+        popularity: 100
+      }));
+    } else {
+      list = filteredArtists;
+    }
+
+    if (activeTab === 'popular') {
+      return [...list].sort((a, b) => b.popularity - a.popularity);
+    }
+    
+    if (activeTab === 'recent') {
+      return [...list].reverse();
+    }
+
+    return list;
+  }, [activeTab, filteredArtists, followedArtists]);
+
+  const sortedArtists = useMemo(() => {
+    let list = [...displayedArtists];
+    if (sortBy === 'az') {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      list.sort((a, b) => b.popularity - a.popularity);
+    }
+    return list;
+  }, [displayedArtists, sortBy]);
+
+  const popularSectionArtists = useMemo(() => {
+    return [...artists].sort((a, b) => b.popularity - a.popularity).slice(0, 6);
+  }, [artists]);
+
+  if (isMobile) {
+    return (
+      <div className={`artists-page mobile-artists-page ${embedded ? 'artists-page--embedded' : ''}`}>
+        {!embedded && (
+          <div className="artists-mobile-header">
+            <button className="artists-mobile-back-btn" onClick={() => navigate(-1)} aria-label="Go back">
+              <ArrowLeft size={24} />
+            </button>
+            <span className="artists-mobile-header-title">Artists</span>
+            <button className="artists-mobile-filter-btn" aria-label="Filters">
+              <SlidersHorizontal size={20} />
+            </button>
+          </div>
+        )}
+
+        {/* Hero Banner (microphone background) */}
+        {!embedded && (
+          <section 
+            className="artists-page__hero mobile-hero"
+            style={{ backgroundImage: `url(${artistsHeroBg})` }}
+          >
+            <div className="artists-page__hero-overlay" />
+            <div className="artists-page__hero-content">
+              <h2>Artists</h2>
+              <p>Explore your favorite artists and their music</p>
+            </div>
+          </section>
+        )}
+
+        {/* Tab Selector pills */}
+        <div className="artists-mobile-tabs">
+          <button className={activeTab === 'all' ? 'active' : ''} onClick={() => setActiveTab('all')}>All</button>
+          <button className={activeTab === 'following' ? 'active' : ''} onClick={() => setActiveTab('following')}>Following</button>
+          <button className={activeTab === 'popular' ? 'active' : ''} onClick={() => setActiveTab('popular')}>Popular</button>
+          <button className={activeTab === 'recent' ? 'active' : ''} onClick={() => setActiveTab('recent')}>Recent</button>
+        </div>
+
+        {errorMessage ? <p className="artists-page__error">{errorMessage}</p> : null}
+        {isLoading ? <p className="artists-page__status">Loading artists...</p> : null}
+
+        <section className="artists-page__list">
+          {sortedArtists.map((artist) => (
+            <ArtistCard 
+              key={artist.id} 
+              artist={artist} 
+              onClick={openArtist} 
+              isFollowing={followedArtists.some(fa => fa.name.toLowerCase() === artist.name.toLowerCase())}
+              onToggleFollow={toggleFollow}
+              viewMode="list"
+            />
+          ))}
+        </section>
+
+        {!isLoading && sortedArtists.length === 0 && (
+          <div className="artists-page__empty">No artists found</div>
+        )}
+
+        <div className="artists-page__footer">
+          {nextPageToken && activeTab === 'all' && (
+            <button type="button" className="artists-page__load-more" onClick={loadMore} disabled={isLoadingMore}>
+              {isLoadingMore ? 'Loading...' : 'Load More'}
+            </button>
+          )}
+        </div>
+
+        <div ref={sentinelRef} className="artists-page__sentinel" aria-hidden="true" />
+      </div>
+    );
+  }
+
   return (
     <div className={`artists-page ${embedded ? 'artists-page--embedded' : ''}`}>
       {!embedded && (
-        <div className="library-mobile-header">
-          <div className="library-mobile-header-top">
-            <div className="library-profile-btn" onClick={() => navigate('/profile')}>
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'P'}
-            </div>
-            <span className="library-title">Your Library</span>
-            <div className="library-actions">
-              <button aria-label="Search Library">
-                <Search size={20} />
-              </button>
-            </div>
+        <section 
+          className="artists-page__hero desktop-hero"
+          style={{ backgroundImage: `url(${artistsHeroBg})` }}
+        >
+          <div className="artists-page__hero-overlay" />
+          <div className="artists-page__hero-content">
+            <h1 className="artists-title-large">Artists</h1>
+            <p className="artists-subtitle-large">Explore your favorite artists and their music</p>
           </div>
-          <div className="library-mobile-pills">
-            <button onClick={() => navigate('/library')}>Playlists</button>
-            <button className="active" onClick={() => navigate('/artists')}>Artists</button>
-          </div>
-        </div>
+        </section>
       )}
-      <section className="artists-page__hero">
-        <div>
-          <p className="artists-page__eyebrow">Artists</p>
-          <h2>{embedded ? 'Artists' : 'All Artists'}</h2>
-          <p>Browse Indian artists across Hindi, Telugu, Tamil, Kannada, Malayalam, Punjabi, and more.</p>
+
+      {/* Control Bar (tabs, sort, view toggles) */}
+      <div className="artists-control-bar">
+        <div className="artists-desktop-tabs">
+          <button className={activeTab === 'all' ? 'active' : ''} onClick={() => setActiveTab('all')}>All Artists</button>
+          <button className={activeTab === 'following' ? 'active' : ''} onClick={() => setActiveTab('following')}>Following</button>
+          <button className={activeTab === 'popular' ? 'active' : ''} onClick={() => setActiveTab('popular')}>Popular</button>
+          <button className={activeTab === 'recent' ? 'active' : ''} onClick={() => setActiveTab('recent')}>Recent</button>
         </div>
-        <div className="artists-page__search">
-          <form onSubmit={handleSubmit}>
-            <input
-              type="search"
-              value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
-              placeholder="Search artists..."
-              aria-label="Search artists"
-            />
-          </form>
-          <div className="artists-page__filters">
-            <label className="artists-page__filter">
-              <span>Language</span>
-              <select value={languageFilter} onChange={(event) => setLanguageFilter(event.target.value)}>
-                {LANGUAGE_OPTIONS.map((option) => (
-                  <option key={option.value || 'all'} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+
+        <div className="artists-control-actions">
+          <div className="artists-sort-dropdown">
+            <span>Sort by:</span>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <option value="popular">Popular</option>
+              <option value="az">A-Z</option>
+            </select>
+          </div>
+
+          <div className="artists-view-toggles">
+            <button 
+              className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+              onClick={() => setViewMode('grid')}
+              aria-label="Grid View"
+            >
+              <Grid size={18} />
+            </button>
+            <button 
+              className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+              aria-label="List View"
+            >
+              <ListIcon size={18} />
+            </button>
           </div>
         </div>
-      </section>
+      </div>
 
       {errorMessage ? <p className="artists-page__error">{errorMessage}</p> : null}
       {isLoading ? <p className="artists-page__status">Loading artists...</p> : null}
 
-      <section className="artists-page__grid">
-        {filteredArtists.map((artist) => (
-          <ArtistCard key={artist.id} artist={artist} onClick={openArtist} />
+      {/* Grid or List of Artists */}
+      <section className={viewMode === 'grid' ? 'artists-page__grid' : 'artists-page__list-vertical'}>
+        {sortedArtists.map((artist) => (
+          <ArtistCard 
+            key={artist.id} 
+            artist={artist} 
+            onClick={openArtist} 
+            isFollowing={followedArtists.some(fa => fa.name.toLowerCase() === artist.name.toLowerCase())}
+            onToggleFollow={toggleFollow}
+            viewMode={viewMode}
+          />
         ))}
       </section>
 
-      {!isLoading && filteredArtists.length === 0 && (
+      {!isLoading && sortedArtists.length === 0 && (
         <div className="artists-page__empty">No artists found</div>
       )}
 
+      {/* Popular Section at bottom of desktop */}
+      {!embedded && activeTab === 'all' && popularSectionArtists.length > 0 && (
+        <div className="popular-artists-section">
+          <div className="popular-artists-header">
+            <h3>Popular Artists</h3>
+            <span className="view-all-link" onClick={() => setActiveTab('popular')}>View all</span>
+          </div>
+          <div className="popular-artists-row">
+            {popularSectionArtists.map((artist) => {
+              return (
+                <div key={`popular-${artist.id}`} className="popular-artist-circle" onClick={() => openArtist(artist)}>
+                  <div className="popular-artist-img-wrapper">
+                    <img src={artist.image || FALLBACK_IMAGE} alt={artist.name} />
+                  </div>
+                  <strong>{artist.name}</strong>
+                  <span>{getFollowerCount(artist.name)} followers</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="artists-page__footer">
-        {nextPageToken && (
+        {nextPageToken && activeTab === 'all' && (
           <button type="button" className="artists-page__load-more" onClick={loadMore} disabled={isLoadingMore}>
             {isLoadingMore ? 'Loading...' : 'Load More'}
           </button>
