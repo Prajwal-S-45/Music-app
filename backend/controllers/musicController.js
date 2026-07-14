@@ -1,437 +1,186 @@
+const axios = require('axios');
 const pool = require('../config/database');
-const youtubeService = require('../services/youtubeService');
+const cacheService = require('../services/CacheService');
+const jioSaavnService = require('../services/JioSaavnService');
 
-const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
-const FAILED_SEARCH_CACHE_TTL_MS = 20 * 1000;
-const TRENDING_CACHE_TTL_MS = 2 * 60 * 1000;
-const MAX_SEARCH_CACHE_ENTRIES = 500;
 const MAX_RESULT_LIMIT = 50;
-const MIN_QUERY_LENGTH = 2;
-const searchCache = new Map();
-const inFlightSearches = new Map();
-const trendingCache = new Map();
-const artistsCache = new Map();
-const cacheMetrics = {
-  startedAt: Date.now(),
-  search: {
-    hits: 0,
-    misses: 0,
-    staleHits: 0,
-    inFlightJoins: 0,
-    upstreamCalls: 0,
-    quotaFallbacks: 0,
-    rejectedShortQueries: 0,
-    errors: 0,
-  },
-  trending: {
-    hits: 0,
-    misses: 0,
-    staleHits: 0,
-    upstreamCalls: 0,
-    errors: 0,
-  },
-};
 
-const mapCatalogSong = (item) => {
-  const id = item?.videoId || item?.id;
-  return {
-    id,
-    videoId: id,
-    title: item?.title || 'Untitled Track',
-    artist: item?.channelTitle || 'Unknown Channel',
-    channelTitle: item?.channelTitle || 'Unknown Channel',
-    album: item?.album || '',
-    thumbnail: item?.thumbnail || null,
-    duration: Number(item?.duration) || 0,
-    // Kept for old player compatibility. YouTube URLs are not directly streamable in <audio>.
-    file_url: id ? `https://www.youtube.com/watch?v=${id}` : null,
-    source: 'youtube',
-    playable: Boolean(id),
-  };
-};
-
-const normalizeLikedSongSnapshot = (body, normalizedSongId) => ({
-  title: String(body.title || '').trim() || null,
-  artist: String(body.artist || body.channelTitle || '').trim() || null,
-  album: String(body.album || '').trim() || null,
-  thumbnail: String(body.thumbnail || body.cover || body.image || '').trim() || null,
-  duration: Number(body.duration) || null,
-  source: String(body.source || 'youtube').trim() || 'youtube',
-  songId: normalizedSongId,
-});
-
-const mapLikedRow = (row) => ({
-  id: row.song_id,
-  videoId: row.song_id,
-  title: row.title || 'Unavailable video',
-  artist: row.artist || row.channelTitle || 'Unknown Artist',
-  channelTitle: row.artist || row.channelTitle || 'Unknown Artist',
-  album: row.album || '',
-  thumbnail: row.thumbnail || null,
-  cover: row.thumbnail || null,
-  duration: Number(row.duration) || 0,
-  source: row.source || 'youtube',
-  playable: true,
-  likedAt: row.liked_at,
-});
-
-const sendYouTubeError = (res, error, context) => {
-  console.error(`Error in ${context}:`, error);
-
-  if (error.code === 'YOUTUBE_QUOTA_EXCEEDED') {
-    return res.status(429).json({
-      error: 'YouTube API quota exceeded. Please try again later.',
-      code: 'YOUTUBE_QUOTA_EXCEEDED',
-    });
-  }
-
-  return res.status(500).json({
-    error: error.message || 'Request failed',
-    code: error.code || 'REQUEST_FAILED',
-  });
-};
-
-const sanitizeSearchInput = (value) => {
-  return String(value || '')
-    .replace(/[\u0000-\u001F\u007F]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
-
-const normalizeCacheText = (value) => sanitizeSearchInput(value).toLowerCase();
-
-const buildSearchCacheKey = (query, limit) => `${normalizeCacheText(query)}::${Number(limit) || MAX_RESULT_LIMIT}`;
-
-const readSearchCache = (key) => {
-  const cachedEntry = searchCache.get(key);
-  if (!cachedEntry) {
-    return null;
-  }
-
-  const isFresh = cachedEntry.expiresAt > Date.now();
-  return {
-    payload: cachedEntry.payload,
-    isFresh,
-  };
-};
-
-const getSearchCache = (key) => {
-  const entry = readSearchCache(key);
-  if (!entry || !entry.isFresh) {
-    return null;
-  }
-
-  return entry.payload;
-};
-
-const getStaleSearchCache = (key) => {
-  const entry = readSearchCache(key);
-  return entry?.payload || null;
-};
-
-const pruneSearchCache = () => {
-  const now = Date.now();
-
-  for (const [key, value] of searchCache.entries()) {
-    if (value.expiresAt <= now) {
-      searchCache.delete(key);
-    }
-  }
-
-  if (searchCache.size <= MAX_SEARCH_CACHE_ENTRIES) {
-    return;
-  }
-
-  const entriesByExpiry = Array.from(searchCache.entries())
-    .sort((a, b) => a[1].expiresAt - b[1].expiresAt);
-
-  const overflow = searchCache.size - MAX_SEARCH_CACHE_ENTRIES;
-  for (let index = 0; index < overflow; index += 1) {
-    searchCache.delete(entriesByExpiry[index][0]);
+const isAllowedJioSaavnMediaUrl = (value) => {
+  try {
+    const parsed = new URL(String(value || '').trim());
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    const host = parsed.hostname.toLowerCase();
+    return host === 'jiosaavn.com' || host.endsWith('.jiosaavn.com') || host === 'saavncdn.com' || host.endsWith('.saavncdn.com');
+  } catch {
+    return false;
   }
 };
 
-const getTrendingCache = (key) => {
-  const entry = trendingCache.get(key);
-  if (!entry) {
-    return null;
-  }
-
-  if (entry.expiresAt <= Date.now()) {
-    trendingCache.delete(key);
-    return null;
-  }
-
-  return entry.payload;
-};
-
-const getStaleTrendingCache = (key) => {
-  const entry = trendingCache.get(key);
-  return entry?.payload || null;
-};
-
-const getArtistsCache = (key) => {
-  const entry = artistsCache.get(key);
-  if (!entry) {
-    return null;
-  }
-
-  if (entry.expiresAt <= Date.now()) {
-    artistsCache.delete(key);
-    return null;
-  }
-
-  return entry.payload;
-};
-
-const getStaleArtistsCache = (key) => {
-  const entry = artistsCache.get(key);
-  return entry?.payload || null;
-};
-
-const setArtistsCache = (key, payload, ttlMs = SEARCH_CACHE_TTL_MS) => {
-  artistsCache.set(key, {
-    expiresAt: Date.now() + ttlMs,
-    payload,
-  });
-};
-
-const setTrendingCache = (key, payload) => {
-  trendingCache.set(key, {
-    expiresAt: Date.now() + TRENDING_CACHE_TTL_MS,
-    payload,
-  });
-};
-
-const setSearchCache = (key, payload, ttlMs = SEARCH_CACHE_TTL_MS) => {
-  pruneSearchCache();
-
-  searchCache.set(key, {
-    expiresAt: Date.now() + ttlMs,
-    payload,
-  });
-};
-
-const formatSearchResponse = ({ source, query, data, warning, cached = false, stale = false }) => ({
-  success: true,
-  source,
-  query,
-  total: Array.isArray(data) ? data.length : 0,
-  data: Array.isArray(data) ? data : [],
-  cached,
-  stale,
-  ...(warning ? { warning } : {}),
-});
+// Curated popular artist list for browse/library view
+const POPULAR_ARTISTS_CATALOG = [
+  // Indian Artists
+  { name: 'Arijit Singh', language: 'Hindi' },
+  { name: 'Shreya Ghoshal', language: 'Hindi' },
+  { name: 'Sonu Nigam', language: 'Hindi' },
+  { name: 'Jubin Nautiyal', language: 'Hindi' },
+  { name: 'Neha Kakkar', language: 'Hindi' },
+  { name: 'Atif Aslam', language: 'Hindi' },
+  { name: 'Kumar Sanu', language: 'Hindi' },
+  { name: 'Lata Mangeshkar', language: 'Hindi' },
+  { name: 'Kishore Kumar', language: 'Hindi' },
+  { name: 'Mohammed Rafi', language: 'Hindi' },
+  { name: 'Rahat Fateh Ali Khan', language: 'Hindi' },
+  { name: 'Armaan Malik', language: 'Hindi' },
+  { name: 'Pritam', language: 'Hindi' },
+  { name: 'A.R. Rahman', language: 'Tamil' },
+  { name: 'S.P. Balasubrahmanyam', language: 'Telugu' },
+  { name: 'Sid Sriram', language: 'Tamil' },
+  { name: 'Anirudh Ravichander', language: 'Tamil' },
+  { name: 'Vijay Prakash', language: 'Kannada' },
+  { name: 'K.J. Yesudas', language: 'Malayalam' },
+  { name: 'K.S. Chitra', language: 'Tamil' },
+  // Global Artists
+  { name: 'Adele', language: 'English' },
+  { name: 'Taylor Swift', language: 'English' },
+  { name: 'Ed Sheeran', language: 'English' },
+  { name: 'The Weeknd', language: 'English' },
+  { name: 'Dua Lipa', language: 'English' },
+];
 
 exports.getCacheStats = async (req, res) => {
   return res.json({
     success: true,
     cache: {
-      uptimeMs: Date.now() - cacheMetrics.startedAt,
-      search: {
-        ...cacheMetrics.search,
-        size: searchCache.size,
-        inFlight: inFlightSearches.size,
-        ttlMs: SEARCH_CACHE_TTL_MS,
-        failedTtlMs: FAILED_SEARCH_CACHE_TTL_MS,
-        maxEntries: MAX_SEARCH_CACHE_ENTRIES,
-      },
-      trending: {
-        ...cacheMetrics.trending,
-        size: trendingCache.size,
-        ttlMs: TRENDING_CACHE_TTL_MS,
-      },
+      status: 'Using generic cache layer',
+      redisConnected: cacheService.isRedisConnected
     },
   });
 };
 
 exports.getSongs = async (req, res) => {
-  const parsedLimit = parseInt(req.query.limit, 10);
-  const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? MAX_RESULT_LIMIT : parsedLimit, 1), MAX_RESULT_LIMIT);
-
-  try {
-    const songs = await youtubeService.getTrendingSongs(limit);
-    const data = Array.isArray(songs) ? songs.map(mapCatalogSong) : [];
-
-    return res.json({
-      success: true,
-      source: 'youtube',
-      total: data.length,
-      data,
-    });
-  } catch (error) {
-    console.error('Error in getSongs:', error);
-    return res.json({
-      success: true,
-      source: 'youtube',
-      total: 0,
-      data: [],
-      warning: error?.code === 'YOUTUBE_QUOTA_EXCEEDED'
-        ? 'YouTube quota exceeded. Returning empty results.'
-        : 'Song catalog unavailable. Returning empty results.',
-    });
-  }
+  // Aliased to getTrending
+  return exports.getTrending(req, res);
 };
 
 exports.getArtists = async (req, res) => {
-  const rawQuery = sanitizeSearchInput(req.query.q || req.query.query || '');
-  const rawLanguage = sanitizeSearchInput(req.query.language || '');
-  const normalizedQuery = normalizeCacheText(rawQuery);
-  const normalizedLanguage = normalizeCacheText(rawLanguage);
-  const pageToken = String(req.query.pageToken || '').trim();
-  const parsedLimit = parseInt(req.query.limit, 10);
-  const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? MAX_RESULT_LIMIT : parsedLimit, 1), MAX_RESULT_LIMIT);
-  const cacheKey = `artists-v2::${normalizedQuery}::${normalizedLanguage}::${pageToken}::${limit}`;
+  const rawQuery = String(req.query.q || req.query.query || req.query.name || '').trim();
+  const languageFilter = String(req.query.language || '').trim();
 
-  const cachedPayload = getArtistsCache(cacheKey);
-  if (cachedPayload) {
+  // No query = return curated catalog (used by Library > Artists page)
+  if (!rawQuery) {
+    let catalog = [...POPULAR_ARTISTS_CATALOG];
+
+    if (languageFilter) {
+      catalog = catalog.filter(a => a.language.toLowerCase() === languageFilter.toLowerCase());
+    }
+
+    const data = catalog.map((a, i) => ({
+      id: `catalog-${i}-${a.name.toLowerCase().replace(/\s/g, '-')}`,
+      name: a.name,
+      language: a.language,
+      thumbnail: null, // ArtistCard will fetch image individually via /api/music/artist-image
+    }));
+
     return res.json({
-      ...cachedPayload,
-      cached: true,
+      success: true,
+      source: 'catalog',
+      total: data.length,
+      data,
     });
   }
 
+  // With query = search via JioSaavn
   try {
-    const { artists, nextPageToken, source, warning } = await youtubeService.getArtists({
-      query: rawQuery,
-      language: rawLanguage,
-      pageToken,
-      limit,
-    });
+    const artist = await jioSaavnService.searchArtist(rawQuery);
 
-    const payload = {
-      success: true,
-      source: source || 'musicbrainz',
-      query: rawQuery,
-      language: rawLanguage,
-      total: Array.isArray(artists) ? artists.length : 0,
-      data: Array.isArray(artists) ? artists : [],
-      nextPageToken,
-      ...(warning ? { warning } : {}),
-    };
-
-    setArtistsCache(cacheKey, payload);
-    return res.json(payload);
-  } catch (error) {
-    console.error('Error in getArtists:', error);
-    const stalePayload = getStaleArtistsCache(cacheKey);
-    if (stalePayload) {
-      return res.json({
-        ...stalePayload,
-        cached: true,
-        stale: true,
-        warning: 'Serving cached artists because YouTube is unavailable.',
-      });
+    if (!artist) {
+      return res.status(404).json({ error: 'Artist not found' });
     }
 
     return res.json({
       success: true,
-      source: 'artist-directory',
+      source: 'jiosaavn',
       query: rawQuery,
-      language: rawLanguage,
-      total: 0,
-      data: [],
-      nextPageToken: '',
-      warning: error?.code === 'YOUTUBE_QUOTA_EXCEEDED'
-        ? 'YouTube quota exceeded. Returning empty artists list.'
-        : 'Artists unavailable. Returning empty list.',
+      total: 1,
+      data: [artist],
     });
+  } catch (error) {
+    console.error('Error in getArtists:', error);
+    return res.status(500).json({ error: 'Failed to fetch artist details' });
+  }
+};
+
+exports.getArtistDetails = async (req, res) => {
+  const rawQuery = String(req.query.q || req.query.query || req.query.name || '').trim();
+  
+  if (!rawQuery) {
+    return res.status(400).json({ error: 'Artist name is required' });
+  }
+
+  try {
+    const artistSearchResult = await jioSaavnService.searchArtist(rawQuery);
+    if (!artistSearchResult) {
+      return res.status(404).json({ error: 'Artist not found' });
+    }
+
+    const artistDetails = await jioSaavnService.getArtistDetails(artistSearchResult.id);
+    if (!artistDetails) {
+      return res.status(404).json({ error: 'Artist details not found' });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        albums: artistDetails.albums || [],
+        videos: [],
+        relatedArtists: artistDetails.biography.similarArtists || [],
+        aboutStats: {
+          fans: artistDetails.biography.listeners || 0,
+          bio: artistDetails.biography.biography || ''
+        },
+        artist: {
+          id: artistDetails.artist.id,
+          name: artistDetails.artist.name,
+          thumbnail: artistDetails.artist.image,
+          image: artistDetails.artist.image,
+          language: artistDetails.artist.language,
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error in getArtistDetails:', error);
+    return res.status(500).json({ error: 'Failed to fetch artist details' });
   }
 };
 
 exports.searchSongs = async (req, res) => {
-  const { q, query, type } = req.query;
-  const searchQuery = sanitizeSearchInput(q || query || '');
-  const searchTypeCandidate = normalizeCacheText(type || 'song');
-  const searchType = ['song', 'artist', 'album'].includes(searchTypeCandidate) ? searchTypeCandidate : 'song';
+  const { q, query } = req.query;
+  const searchQuery = String(q || query || '').trim();
   const parsedLimit = parseInt(req.query.limit, 10);
   const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? MAX_RESULT_LIMIT : parsedLimit, 1), MAX_RESULT_LIMIT);
-  const cacheKey = buildSearchCacheKey(`${searchType}:${searchQuery}`, limit);
+
+  if (!searchQuery || searchQuery.length < 2) {
+    return res.json({
+      success: true,
+      source: 'jiosaavn',
+      query: searchQuery,
+      data: [],
+      warning: `Type at least 2 characters to search.`,
+    });
+  }
 
   try {
-    if (!searchQuery || searchQuery.length < MIN_QUERY_LENGTH) {
-      cacheMetrics.search.rejectedShortQueries += 1;
-      return res.json(formatSearchResponse({
-        source: 'youtube',
-        query: searchQuery,
-        data: [],
-        warning: `Type at least ${MIN_QUERY_LENGTH} characters to search.`,
-      }));
-    }
-
-    const cachedPayload = getSearchCache(cacheKey);
-    if (cachedPayload) {
-      cacheMetrics.search.hits += 1;
-      return res.json(formatSearchResponse({ ...cachedPayload, cached: true }));
-    }
-
-    cacheMetrics.search.misses += 1;
-
-    if (inFlightSearches.has(cacheKey)) {
-      cacheMetrics.search.inFlightJoins += 1;
-      const inFlightPayload = await inFlightSearches.get(cacheKey);
-      return res.json(formatSearchResponse({ ...inFlightPayload, cached: true }));
-    }
-
-    const stalePayload = getStaleSearchCache(cacheKey);
-
-    const searchPromise = (async () => {
-      try {
-        cacheMetrics.search.upstreamCalls += 1;
-        let songs = [];
-        if (searchType === 'artist') {
-          songs = await youtubeService.searchArtists(searchQuery, limit);
-        } else if (searchType === 'album') {
-          songs = await youtubeService.searchAlbums(searchQuery, limit);
-        } else {
-          songs = await youtubeService.searchSongs(searchQuery, limit);
-        }
-
-        const payload = {
-          source: 'youtube',
-          query: searchQuery,
-          data: songs,
-        };
-        setSearchCache(cacheKey, payload);
-        return payload;
-      } catch (error) {
-        console.error('YouTube search failed, returning empty array:', error?.message || error);
-        cacheMetrics.search.errors += 1;
-
-        if (error?.code === 'YOUTUBE_QUOTA_EXCEEDED' && stalePayload) {
-          cacheMetrics.search.staleHits += 1;
-          cacheMetrics.search.quotaFallbacks += 1;
-          const payload = {
-            ...stalePayload,
-            query: searchQuery,
-            warning: 'YouTube quota exceeded. Returning cached results.',
-            stale: true,
-          };
-          setSearchCache(cacheKey, payload, FAILED_SEARCH_CACHE_TTL_MS);
-          return payload;
-        }
-
-        const payload = {
-          source: 'youtube',
-          query: searchQuery,
-          data: [],
-          warning: error?.code === 'YOUTUBE_QUOTA_EXCEEDED'
-            ? 'YouTube quota exceeded. Returning empty results.'
-            : 'YouTube search unavailable. Returning empty results.',
-        };
-        setSearchCache(cacheKey, payload, FAILED_SEARCH_CACHE_TTL_MS);
-        return payload;
-      }
-    })();
-
-    inFlightSearches.set(cacheKey, searchPromise);
-
-    const payload = await searchPromise;
-    return res.json(formatSearchResponse(payload));
+    const songs = await jioSaavnService.searchSongs(searchQuery, limit);
+    return res.json({
+      success: true,
+      source: 'jiosaavn',
+      query: searchQuery,
+      total: songs.length,
+      data: songs,
+    });
   } catch (error) {
-    return sendYouTubeError(res, error, 'searchSongs');
-  } finally {
-    inFlightSearches.delete(cacheKey);
+    console.error('Error in searchSongs:', error.message || error);
+    return res.status(500).json({ error: 'Failed to search songs' });
   }
 };
 
@@ -439,102 +188,53 @@ exports.getTrending = async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || MAX_RESULT_LIMIT, MAX_RESULT_LIMIT);
   const cacheKey = `trending::${limit}`;
 
-  const cachedPayload = getTrendingCache(cacheKey);
+  const cachedPayload = await cacheService.get(cacheKey);
   if (cachedPayload) {
-    cacheMetrics.trending.hits += 1;
     return res.json({
       ...cachedPayload,
       cached: true,
     });
   }
 
-  cacheMetrics.trending.misses += 1;
-
   try {
-    cacheMetrics.trending.upstreamCalls += 1;
-    const songs = await youtubeService.getTrendingSongs(limit);
+    const songs = await jioSaavnService.getTrendingSongs(limit);
 
     const payload = {
       success: true,
-      source: 'youtube',
+      source: 'jiosaavn',
       total: songs.length,
       data: songs,
     };
 
-    setTrendingCache(cacheKey, payload);
+    // Cache trending for 6 hours
+    await cacheService.set(cacheKey, payload, 6 * 60 * 60);
     return res.json(payload);
   } catch (error) {
     console.error('Error in getTrending:', error);
-    cacheMetrics.trending.errors += 1;
-    const stalePayload = getStaleTrendingCache(cacheKey);
-    if (stalePayload) {
-      cacheMetrics.trending.staleHits += 1;
-      return res.json({
-        ...stalePayload,
-        warning: 'Trending cache served because YouTube is unavailable.',
-        stale: true,
-      });
-    }
-
-    return res.json({
-      success: true,
-      source: 'youtube',
-      total: 0,
-      data: [],
-      warning: error?.code === 'YOUTUBE_QUOTA_EXCEEDED'
-        ? 'YouTube quota exceeded. Returning empty results.'
-        : 'Trending unavailable. Returning empty results.',
-    });
+    return res.status(500).json({ error: 'Failed to fetch trending songs' });
   }
 };
 
+// ... Liked Songs methods ...
 exports.likeSong = async (req, res) => {
   try {
-    const { songId, videoId } = req.body;
+    const { songId, videoId, title, artist, album, thumbnail, duration, source } = req.body;
     const normalizedSongId = String(songId || videoId || '').trim();
-    const snapshot = normalizeLikedSongSnapshot(req.body, normalizedSongId);
     const userId = req.userId;
 
-    if (!normalizedSongId) {
-      return res.status(400).json({ error: 'Song ID is required' });
-    }
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
+    if (!normalizedSongId) return res.status(400).json({ error: 'Song ID is required' });
+    if (!userId) return res.status(401).json({ error: 'User not authenticated' });
 
     const connection = await pool.getConnection();
-
     try {
-      const [existing] = await connection.execute(
-        'SELECT id FROM liked_songs WHERE user_id = ? AND song_id = ?',
-        [userId, normalizedSongId]
-      );
-
-      if (existing.length > 0) {
-        return res.status(400).json({ error: 'Song already liked' });
-      }
+      const [existing] = await connection.execute('SELECT id FROM liked_songs WHERE user_id = ? AND song_id = ?', [userId, normalizedSongId]);
+      if (existing.length > 0) return res.status(400).json({ error: 'Song already liked' });
 
       await connection.execute(
-        `INSERT INTO liked_songs
-          (user_id, song_id, title, artist, album, thumbnail, duration, source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          userId,
-          normalizedSongId,
-          snapshot.title,
-          snapshot.artist,
-          snapshot.album,
-          snapshot.thumbnail,
-          snapshot.duration,
-          snapshot.source,
-        ]
+        `INSERT INTO liked_songs (user_id, song_id, title, artist, album, thumbnail, duration, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, normalizedSongId, title || null, artist || null, album || null, thumbnail || null, duration || 0, source || 'jiosaavn']
       );
-
-      return res.json({
-        success: true,
-        message: 'Song liked successfully',
-      });
+      return res.json({ success: true, message: 'Song liked successfully' });
     } finally {
       connection.release();
     }
@@ -549,27 +249,14 @@ exports.unlikeSong = async (req, res) => {
     const { songId } = req.params;
     const userId = req.userId;
 
-    if (!songId) {
-      return res.status(400).json({ error: 'Song ID is required' });
-    }
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
+    if (!songId) return res.status(400).json({ error: 'Song ID is required' });
+    if (!userId) return res.status(401).json({ error: 'User not authenticated' });
 
     const connection = await pool.getConnection();
-
     try {
       const [result] = await connection.execute('DELETE FROM liked_songs WHERE user_id = ? AND song_id = ?', [userId, songId]);
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: 'Like not found' });
-      }
-
-      return res.json({
-        success: true,
-        message: 'Song unliked successfully',
-      });
+      if (result.affectedRows === 0) return res.status(404).json({ error: 'Like not found' });
+      return res.json({ success: true, message: 'Song unliked successfully' });
     } finally {
       connection.release();
     }
@@ -582,61 +269,172 @@ exports.unlikeSong = async (req, res) => {
 exports.getLikedSongs = async (req, res) => {
   try {
     const userId = req.userId;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
+    if (!userId) return res.status(401).json({ error: 'User not authenticated' });
 
     const connection = await pool.getConnection();
-
     try {
-      const [rows] = await connection.execute(
-        `SELECT song_id, title, artist, album, thumbnail, duration, source, liked_at
-         FROM liked_songs
-         WHERE user_id = ?
-         ORDER BY liked_at DESC`,
-        [userId]
-      );
+      const [rows] = await connection.execute(`SELECT song_id, title, artist, album, thumbnail, duration, source, liked_at FROM liked_songs WHERE user_id = ? ORDER BY liked_at DESC`, [userId]);
+      
+      const mappedSongs = rows.map(r => ({
+        id: r.song_id,
+        videoId: null,
+        title: r.title,
+        artist: r.artist,
+        album: r.album,
+        thumbnail: r.thumbnail,
+        cover: r.thumbnail,
+        duration: r.duration,
+        source: r.source,
+        liked_at: r.liked_at
+      }));
 
-      const videoIds = rows.map((row) => row.song_id);
-      let detailedSongs = [];
-
-      try {
-        detailedSongs = await youtubeService.getVideosByIds(videoIds);
-      } catch (error) {
-        console.warn('Could not fetch full YouTube metadata for liked songs:', error.message);
-      }
-
-      const songsById = new Map(detailedSongs.map((song) => [song.id, song]));
-      const likedSongs = rows.map((row) => {
-        const detailedSong = songsById.get(row.song_id);
-        const storedSong = mapLikedRow(row);
-
-        return {
-          ...storedSong,
-          ...detailedSong,
-          id: row.song_id,
-          videoId: row.song_id,
-          title: detailedSong?.title || storedSong.title,
-          artist: detailedSong?.artist || detailedSong?.channelTitle || storedSong.artist,
-          channelTitle: detailedSong?.channelTitle || detailedSong?.artist || storedSong.channelTitle,
-          thumbnail: detailedSong?.thumbnail || storedSong.thumbnail,
-          cover: detailedSong?.thumbnail || storedSong.cover,
-          duration: Number(detailedSong?.duration) || storedSong.duration,
-          likedAt: row.liked_at,
-        };
-      });
-
-      return res.json({
-        success: true,
-        data: likedSongs,
-        total: likedSongs.length,
-      });
+      return res.json({ success: true, data: mappedSongs, total: mappedSongs.length });
     } finally {
       connection.release();
     }
   } catch (error) {
     console.error('Error in getLikedSongs:', error);
     return res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getArtistImage = async (req, res) => {
+  const artistName = String(req.query.name || '').trim();
+  if (!artistName) return res.status(400).json({ error: 'Artist name is required' });
+
+  try {
+    const artist = await jioSaavnService.searchArtist(artistName);
+    if (artist && artist.image) {
+      return res.json({ url: artist.image });
+    }
+    return res.json({ url: '' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to fetch artist image' });
+  }
+};
+
+exports.playSong = async (req, res) => {
+  const { trackId } = req.params;
+
+  if (!trackId) {
+    return res.status(400).json({ error: 'Track ID is required' });
+  }
+
+  try {
+    const songDetails = await jioSaavnService.getSongDetails(trackId);
+    if (songDetails) {
+      return res.json({
+        success: true,
+        videoId: null,
+        file_url: songDetails.file_url,
+        song: songDetails
+      });
+    }
+
+    return res.status(404).json({ error: 'Playable audio not found' });
+  } catch (error) {
+    console.error('Error in playSong:', error);
+    return res.status(500).json({ error: 'Failed to retrieve playback video' });
+  }
+};
+exports.streamSong = async (req, res) => {
+  const { trackId } = req.params;
+
+  if (!trackId) {
+    return res.status(400).json({ error: 'Track ID is required' });
+  }
+
+  try {
+    const queryStreamUrl = String(req.query.url || '').trim();
+    let streamUrl = isAllowedJioSaavnMediaUrl(queryStreamUrl) ? queryStreamUrl : '';
+
+    if (!streamUrl) {
+      const songDetails = await jioSaavnService.getSongDetails(trackId);
+      streamUrl = songDetails?.file_url || '';
+    }
+
+    if (!streamUrl) {
+      return res.status(404).json({ error: 'Playable audio not found' });
+    }
+
+    const upstreamHeaders = {
+      Referer: 'https://www.jiosaavn.com/',
+      Origin: 'https://www.jiosaavn.com',
+      'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0',
+      Accept: req.headers.accept || '*/*',
+    };
+
+    if (req.headers.range) {
+      upstreamHeaders.Range = req.headers.range;
+    }
+
+    const upstream = await axios.get(streamUrl, {
+      responseType: 'stream',
+      timeout: 15000,
+      maxRedirects: 5,
+      validateStatus: () => true,
+      headers: upstreamHeaders,
+    });
+
+    if (upstream.status < 200 || upstream.status >= 300) {
+      return res.status(upstream.status).json({ error: 'Upstream audio unavailable' });
+    }
+
+    const passthroughHeaders = [
+      'content-type',
+      'content-length',
+      'content-range',
+      'accept-ranges',
+      'cache-control',
+      'etag',
+      'last-modified',
+    ];
+
+    passthroughHeaders.forEach((header) => {
+      const value = upstream.headers[header];
+      if (value) res.setHeader(header, value);
+    });
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.status(upstream.status);
+    upstream.data.pipe(res);
+  } catch (error) {
+    console.error('Error in streamSong:', error.message || error);
+    return res.status(500).json({ error: 'Failed to stream audio' });
+  }
+};
+
+exports.getArtistAlbums = async (req, res) => {
+  const artistName = String(req.query.artist || req.query.name || '').trim();
+
+  if (!artistName) {
+    return res.status(400).json({ error: 'artist name is required' });
+  }
+
+  const cacheKey = `albums:${artistName.toLowerCase()}`;
+
+  try {
+    // 1. Check cache
+    const cached = await cacheService.get(cacheKey);
+    if (cached && req.query.nocache !== 'true') {
+      return res.json({ success: true, source: 'cache', data: cached });
+    }
+
+    // 2. Fetch artist and their albums from JioSaavn
+    const artist = await jioSaavnService.searchArtist(artistName);
+    if (!artist) {
+      return res.json({ success: true, source: 'jiosaavn', data: [] });
+    }
+
+    const artistDetails = await jioSaavnService.getArtistDetails(artist.id);
+    const albums = artistDetails?.albums || [];
+
+    // 3. Cache for 24 hours
+    await cacheService.set(cacheKey, albums, 86400);
+
+    return res.json({ success: true, source: 'jiosaavn', data: albums });
+  } catch (error) {
+    console.error('Error in getArtistAlbums:', error);
+    return res.status(500).json({ error: 'Failed to fetch albums' });
   }
 };
