@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { Play } from 'lucide-react';
 
 function CardGrid({ title, items, variant = 'square', onActivate }) {
