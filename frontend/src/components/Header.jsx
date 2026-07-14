@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import '../styles/Header.css';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -20,9 +20,9 @@ import {
 import SearchDropdown from './SearchDropdown';
 
 const navItems = [
-  { label: 'Music', icon: Music2 },
-  { label: 'Podcasts', icon: Mic2 },
-  { label: 'Radio', icon: Radio },
+  { label: 'Music', icon: Music2, to: '/' },
+  { label: 'Podcasts', icon: Mic2, to: '/podcasts' },
+  { label: 'Radio', icon: Radio, to: '/radio' },
 ];
 
 const languageOptions = [
@@ -41,11 +41,19 @@ const recentSearches = ['Kannada hits', 'Lo-fi focus', 'Arijit Singh', '90s love
 
 function Header({ userName, user, onSearchSubmit, language, onLanguageChange, onLogout, onPlayTrack, onLikeTrack, onQueueTrack, onToggleSidebar }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [query, setQuery] = useState('');
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('Music');
+
+  const activeTab = useMemo(() => {
+    const path = location.pathname;
+    if (path === '/podcasts') return 'Podcasts';
+    if (path === '/radio') return 'Radio';
+    return 'Music';
+  }, [location.pathname]);
+
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -208,7 +216,7 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
                 key={item.label}
                 type="button"
                 className={`app-header__tab ${active ? 'active' : ''}`}
-                onClick={() => setActiveTab(item.label)}
+                onClick={() => navigate(item.to)}
                 whileHover={{ y: -1, scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
               >
