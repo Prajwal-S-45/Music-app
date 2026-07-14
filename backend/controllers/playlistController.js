@@ -1,15 +1,16 @@
 const Playlist = require('../models/Playlist');
-const youtubeService = require('../services/youtubeService');
+const jioSaavnService = require('../services/JioSaavnService');
 
-const mapFallbackVideo = (videoId) => ({
-  id: videoId,
-  videoId,
-  title: 'Unavailable video',
+const mapFallbackSong = (songId) => ({
+  id: songId,
+  videoId: null,
+  title: 'Unavailable Song',
   thumbnail: null,
-  channelTitle: 'Unknown Channel',
-  source: 'youtube',
+  artist: 'Unknown Artist',
+  source: 'jiosaavn',
   playable: false,
 });
+
 
 exports.createPlaylist = async (req, res) => {
   try {
@@ -101,34 +102,24 @@ exports.getPlaylistSongs = async (req, res) => {
     }
 
     const rows = await Playlist.getPlaylistSongs(playlistId);
-    const videoIds = rows.map((row) => row.song_id);
+    const songIds = rows.map((row) => row.song_id);
 
     let detailedSongs = [];
-    try {
-      detailedSongs = await youtubeService.getVideosByIds(videoIds);
-    } catch (error) {
-      console.warn('Could not fetch full YouTube metadata for playlist songs:', error.message);
-      detailedSongs = [];
-
-      for (const videoId of videoIds) {
-        try {
-          const [song] = await youtubeService.getVideosByIds([videoId]);
-          if (song) {
-            detailedSongs.push(song);
-          }
-        } catch (singleError) {
-          console.warn(`Could not fetch YouTube metadata for playlist song ${videoId}:`, singleError.message);
-        }
+    if (songIds.length > 0) {
+      try {
+        detailedSongs = await jioSaavnService.getSongDetails(songIds);
+      } catch (error) {
+        console.warn('Could not fetch JioSaavn metadata for playlist songs:', error.message);
       }
     }
 
     const songsById = new Map(detailedSongs.map((song) => [song.id, song]));
-    const songs = videoIds.map((videoId) => songsById.get(videoId) || mapFallbackVideo(videoId));
+    const songs = songIds.map((songId) => songsById.get(songId) || mapFallbackSong(songId));
 
     res.json({
       success: true,
       data: songs.filter(Boolean),
-      total: songs.filter(Boolean).length,
+      total: songs.length,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
