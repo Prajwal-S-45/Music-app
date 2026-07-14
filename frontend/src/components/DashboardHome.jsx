@@ -21,20 +21,25 @@ const formatDuration = (seconds) => {
 };
 
 const formatTrack = (track) => {
-  if (!track || !(track.videoId || track.id)) {
+  if (!track || !(track.id || track.videoId)) {
     return null;
   }
 
-  const trackId = track.videoId || track.id;
+  const isJioSaavn = track.source === 'jiosaavn' || track.source === 'mock-fallback';
+  const trackId = track.id || track.videoId;
 
   return {
+    ...track,
     id: trackId,
-    videoId: trackId,
+    videoId: isJioSaavn ? null : trackId,
     title: track.title || 'Untitled Track',
-    artist: track.channelTitle || track.artist || 'Unknown Artist',
-    cover: track.thumbnail || track.cover || DEFAULT_COVER,
+    artist: track.artist || track.channelTitle || 'Unknown Artist',
+    cover: track.cover || track.thumbnail || DEFAULT_COVER,
     duration: Number(track.duration) || 0,
-    source: 'youtube',
+    source: track.source || 'jiosaavn',
+    // Preserve streaming URL for JioSaavn tracks
+    streamUrl: isJioSaavn ? (track.file_url || track.streamUrl || '') : null,
+    file_url: track.file_url || '',
   };
 };
 
