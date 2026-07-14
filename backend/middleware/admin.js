@@ -24,7 +24,7 @@ const adminMiddleware = async (req, res, next) => {
     }
 
     next();
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Admin check failed' });
   }
 };
