@@ -1,7 +1,9 @@
+// HistoryPage.jsx - Cache Buster v3
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Album,
+  ChevronLeft,
   Clock3,
   History,
   ListMusic,
@@ -14,9 +16,10 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
+import historyHeaderBg from '../assets/history_header_bg.png';
 import '../styles/HistoryPage.css';
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 40;
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1000&q=80';
 
@@ -48,11 +51,11 @@ const getRelativeTime = (value) => {
   const week = 7 * day;
 
   if (diffMs < minute) return 'Just now';
-  if (diffMs < hour) return `${Math.floor(diffMs / minute)} minutes ago`;
-  if (diffMs < day) return `${Math.floor(diffMs / hour)} hours ago`;
+  if (diffMs < hour) return `${Math.floor(diffMs / minute)}m ago`;
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}h ago`;
   if (diffMs < day * 2) return 'Yesterday';
-  if (diffMs < week) return `${Math.floor(diffMs / day)} days ago`;
-  return `${Math.floor(diffMs / week)} weeks ago`;
+  if (diffMs < week) return `${Math.floor(diffMs / day)}d ago`;
+  return `${Math.floor(diffMs / week)}w ago`;
 };
 
 const getSectionName = (value) => {
@@ -77,26 +80,42 @@ const groupActivities = (items) => {
 
 const getActivityText = (item) => {
   const meta = typeMeta[item.type] || typeMeta.song;
-  return `${meta.label} ${getRelativeTime(item.timestamp)}`;
+  return `${meta.label} • ${getRelativeTime(item.timestamp)}`;
 };
 
-const getYoutubeId = (...values) => {
+const getSongId = (...values) => {
   return values
     .map((value) => String(value || '').trim())
-    .find((value) => /^[A-Za-z0-9_-]{11}$/.test(value));
+    .find(Boolean);
 };
 
-function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
+const formatDuration = (secs) => {
+  if (!secs) return '';
+  const minutes = Math.floor(secs / 60);
+  const seconds = Math.floor(secs % 60);
+  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+};
+
+function HistoryPage({ token, activeTrackId, onPlayTrack, onSearchSubmit }) {
   const [items, setItems] = useState([]);
-  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [showClearModal, setShowClearModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [activeTab, setActiveTab] = useState('recently-played'); // 'recently-played' | 'recently-searched' | 'play-history'
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const loaderRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const fetchHistory = useCallback(async ({ offset = 0, append = false } = {}) => {
     if (!token) {
@@ -149,40 +168,56 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
     return () => observer.disconnect();
   }, [fetchHistory, hasMore, items.length, loading, loadingMore]);
 
-  const filteredItems = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return items;
+  // Tab Filtering & Processing Logic
+  const processedItems = useMemo(() => {
+    if (activeTab === 'recently-played') {
+      // Deduplicated unique played items (excluding search queries)
+      const seen = new Set();
+      return items.filter((item) => {
+        if (item.type === 'search') return false;
+        const key = `${item.type}-${item.title}-${item.subtitle || ''}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    } else if (activeTab === 'recently-searched') {
+      // Only search history queries
+      return items.filter((item) => item.type === 'search');
+    } else {
+      // 'play-history': All song items chronologically (allows duplicates)
+      return items.filter((item) => item.type === 'song');
+    }
+  }, [items, activeTab]);
 
-    return items.filter((item) => {
-      return [item.type, item.title, item.subtitle, item.target]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalized));
-    });
-  }, [items, query]);
-
-  const groupedItems = useMemo(() => groupActivities(filteredItems), [filteredItems]);
+  const groupedItems = useMemo(() => groupActivities(processedItems), [processedItems]);
   const sectionNames = ['Today', 'Yesterday', 'Older'].filter((name) => groupedItems[name]?.length);
+
+  const isSongPlaying = (item) => {
+    if (item.type !== 'song') return false;
+    const songId = getSongId(item.metadata?.id, item.metadata?.songId, item.target);
+    return songId && songId === activeTrackId;
+  };
 
   const handleOpen = (item) => {
     setOpenMenuId(null);
     setErrorMessage('');
 
     if (item.type === 'song') {
-      const videoId = getYoutubeId(item.metadata?.videoId, item.metadata?.id, item.target);
-      if (!videoId) {
-        setErrorMessage('Could not play this history item because its video is unavailable.');
+      const songId = getSongId(item.metadata?.id, item.metadata?.songId, item.target);
+      if (!songId) {
+        setErrorMessage('Could not play this history item because its song ID is unavailable.');
         return;
       }
 
       onPlayTrack?.({
-        id: videoId,
-        videoId,
+        id: songId,
+        videoId: null,
         title: item.title,
         artist: item.subtitle,
         cover: item.image,
         thumbnail: item.image,
         duration: item.metadata?.duration || 0,
-        source: item.metadata?.source || 'youtube',
+        source: item.metadata?.source || 'jiosaavn',
       });
       return;
     }
@@ -232,7 +267,7 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
 
   const renderSkeletons = () => (
     <div className="history-skeleton-list">
-      {Array.from({ length: 8 }).map((_, index) => (
+      {Array.from({ length: 6 }).map((_, index) => (
         <div className="history-skeleton-card" key={index}>
           <span />
           <div>
@@ -247,47 +282,90 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
 
   return (
     <motion.section
-      className="history-page"
+      className={`history-page ${isMobile ? 'history-page--mobile' : 'history-page--desktop'}`}
       initial={{ opacity: 0, y: 22 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
     >
-      <header className="history-page__header">
-        <div>
-          <span className="history-page__eyebrow">Activity Feed</span>
-          <h1>History</h1>
-          <p>View your recent activity across the platform</p>
+      {/* Mobile Top Navigation Bar */}
+      {isMobile && (
+        <div className="history-mobile-nav">
+          <button type="button" className="history-mobile-nav__back" onClick={() => navigate(-1)} aria-label="Go back">
+            <ChevronLeft size={24} />
+          </button>
+          <span className="history-mobile-nav__title">History</span>
+          <button
+            type="button"
+            className="history-mobile-nav__clear"
+            onClick={() => setShowClearModal(true)}
+            disabled={items.length === 0}
+            aria-label="Clear history"
+          >
+            <Trash2 size={20} />
+          </button>
+        </div>
+      )}
+
+      {/* Header Banner - Desktop vs Mobile Layout */}
+      {isMobile ? (
+        <div className="history-mobile-banner">
+          <img src={historyHeaderBg} alt="History background" />
+        </div>
+      ) : (
+        <header className="history-page__header">
+          <div className="history-page__header-text">
+            <h1>History</h1>
+            <p>Songs you've played and searched</p>
+          </div>
+        </header>
+      )}
+
+      {/* Tabs & Clear Action Bar */}
+      <div className="history-controls-bar">
+        <div className="history-pills-tabs">
+          <button
+            type="button"
+            className={`history-pill-tab ${activeTab === 'recently-played' ? 'active' : ''}`}
+            onClick={() => setActiveTab('recently-played')}
+          >
+            Recently Played
+          </button>
+          <button
+            type="button"
+            className={`history-pill-tab ${activeTab === 'recently-searched' ? 'active' : ''}`}
+            onClick={() => setActiveTab('recently-searched')}
+          >
+            Recently Searched
+          </button>
+          <button
+            type="button"
+            className={`history-pill-tab ${activeTab === 'play-history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('play-history')}
+          >
+            Play History
+          </button>
         </div>
 
-        <div className="history-page__tools">
-          <label className="history-search">
-            <Search size={18} />
-            <input
-              type="search"
-              placeholder="Search your activity..."
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-
+        {!isMobile && (
           <motion.button
             type="button"
-            className="history-clear"
+            className="history-clear-btn"
             onClick={() => setShowClearModal(true)}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.96 }}
             disabled={items.length === 0}
           >
-            <Trash2 size={17} />
+            <Trash2 size={16} />
             <span>Clear History</span>
           </motion.button>
-        </div>
-      </header>
+        )}
+      </div>
 
       {errorMessage ? (
         <p className="history-page__error" role="alert">{errorMessage}</p>
       ) : null}
 
+      {/* Feed List */}
       {loading ? (
         renderSkeletons()
       ) : items.length === 0 ? (
@@ -297,10 +375,10 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
           <p>Your searches and listening activity will appear here.</p>
           <button type="button" onClick={() => navigate('/')}>Browse Music</button>
         </div>
-      ) : filteredItems.length === 0 ? (
+      ) : processedItems.length === 0 ? (
         <div className="history-empty history-empty--compact">
-          <h2>No matching activity</h2>
-          <p>Try a different song, artist, album, playlist, or search query.</p>
+          <h2>No activity found</h2>
+          <p>Try playing songs or searching for tracks first.</p>
         </div>
       ) : (
         <div className="history-feed">
@@ -314,18 +392,19 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
                 animate="visible"
                 variants={{
                   hidden: {},
-                  visible: { transition: { staggerChildren: 0.045 } },
+                  visible: { transition: { staggerChildren: 0.04 } },
                 }}
               >
                 {groupedItems[sectionName].map((item) => {
                   const meta = typeMeta[item.type] || typeMeta.song;
                   const Icon = meta.icon;
-                  const highlighted = item.type === 'song';
+                  const isSongType = item.type === 'song';
+                  const isCurrent = isSongPlaying(item);
 
                   return (
                     <motion.article
                       key={item.id}
-                      className={`history-card ${highlighted ? 'history-card--highlight' : ''}`}
+                      className={`history-card ${isCurrent ? 'history-card--active' : ''} ${isSongType ? 'history-card--song' : ''}`}
                       tabIndex={0}
                       role="button"
                       onClick={() => handleOpen(item)}
@@ -336,69 +415,89 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
                         }
                       }}
                       variants={{
-                        hidden: { opacity: 0, y: 16 },
-                        visible: { opacity: 1, y: 0, transition: { duration: 0.28 } },
+                        hidden: { opacity: 0, y: 12 },
+                        visible: { opacity: 1, y: 0, transition: { duration: 0.24 } },
                       }}
-                      whileHover={{ y: -2, scale: 1.006 }}
+                      whileHover={{ y: -2 }}
                     >
                       <div className="history-card__media">
                         {item.type === 'search' ? (
                           <Icon size={22} />
                         ) : (
-                          <img
-                            src={item.image || FALLBACK_IMAGE}
-                            alt={item.title}
-                            loading="lazy"
-                            onError={(event) => {
-                              event.currentTarget.onerror = null;
-                              event.currentTarget.src = FALLBACK_IMAGE;
-                            }}
-                          />
+                          <>
+                            <img
+                              src={item.image || FALLBACK_IMAGE}
+                              alt={item.title}
+                              loading="lazy"
+                              onError={(event) => {
+                                event.currentTarget.onerror = null;
+                                event.currentTarget.src = FALLBACK_IMAGE;
+                              }}
+                            />
+                            {isSongType && !isCurrent && (
+                              <div className="history-card__play-overlay">
+                                <Play size={14} fill="currentColor" />
+                              </div>
+                            )}
+                          </>
                         )}
-                        <span className="history-card__type">
-                          <Icon size={14} />
-                        </span>
                       </div>
 
+                      {/* Equalizer Indicator for currently playing tracks */}
+                      {isCurrent && (
+                        <div className="history-card__equalizer" title="Currently Playing">
+                          <span className="eq-bar eq-bar-1"></span>
+                          <span className="eq-bar eq-bar-2"></span>
+                          <span className="eq-bar eq-bar-3"></span>
+                        </div>
+                      )}
+
                       <div className="history-card__body">
-                        <h3>{item.title}</h3>
+                        <h3 className={isCurrent ? 'text-active' : ''}>{item.title}</h3>
                         <p>{item.subtitle || getActivityText(item)}</p>
                       </div>
 
-                      <div className="history-card__time">
-                        <Clock3 size={14} />
-                        <span>{getActivityText(item)}</span>
-                      </div>
+                      <div className="history-card__right-details">
+                        {isSongType && item.metadata?.duration ? (
+                          <span className="history-card__duration">
+                            {formatDuration(item.metadata.duration)}
+                          </span>
+                        ) : (
+                          <span className="history-card__time-ago">
+                            {getRelativeTime(item.timestamp)}
+                          </span>
+                        )}
 
-                      <div className="history-card__menu-wrap" onClick={(event) => event.stopPropagation()}>
-                        <button
-                          type="button"
-                          className="history-card__menu-btn"
-                          onClick={() => setOpenMenuId((value) => (value === item.id ? null : item.id))}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenuId === item.id}
-                        >
-                          <MoreHorizontal size={18} />
-                        </button>
+                        <div className="history-card__menu-wrap" onClick={(event) => event.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="history-card__menu-btn"
+                            onClick={() => setOpenMenuId((value) => (value === item.id ? null : item.id))}
+                            aria-haspopup="menu"
+                            aria-expanded={openMenuId === item.id}
+                          >
+                            <MoreHorizontal size={18} />
+                          </button>
 
-                        <AnimatePresence>
-                          {openMenuId === item.id && (
-                            <motion.div
-                              className="history-menu"
-                              role="menu"
-                              initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
-                              exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                            >
-                              <button type="button" onClick={() => handleOpen(item)}>
-                                <Play size={15} /> <span>Play Again</span>
-                              </button>
-                              <button type="button" className="danger" onClick={() => handleRemove(item.id)}>
-                                <Trash2 size={15} /> <span>Remove From History</span>
-                              </button>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                          <AnimatePresence>
+                            {openMenuId === item.id && (
+                              <motion.div
+                                className="history-menu"
+                                role="menu"
+                                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                              >
+                                <button type="button" onClick={() => handleOpen(item)}>
+                                  <Play size={15} /> <span>{item.type === 'search' ? 'Search Again' : 'Play'}</span>
+                                </button>
+                                <button type="button" className="danger" onClick={() => handleRemove(item.id)}>
+                                  <Trash2 size={15} /> <span>Remove</span>
+                                </button>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
                     </motion.article>
                   );
@@ -413,6 +512,7 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
         </div>
       )}
 
+      {/* Confirmation Modal */}
       <AnimatePresence>
         {showClearModal && (
           <motion.div
@@ -431,13 +531,13 @@ function HistoryPage({ token, onPlayTrack, onSearchSubmit }) {
               exit={{ opacity: 0, y: 20, scale: 0.96 }}
             >
               <h2 id="history-clear-title">Clear all history?</h2>
-              <p>This action cannot be undone.</p>
+              <p>This action cannot be undone. All play logs, search queries, and activity items will be permanently deleted.</p>
               {errorMessage ? (
                 <p className="history-modal__error" role="alert">{errorMessage}</p>
               ) : null}
-              <div>
-                <button type="button" onClick={() => setShowClearModal(false)}>Cancel</button>
-                <button type="button" className="danger" onClick={handleClear}>Clear</button>
+              <div className="history-modal-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowClearModal(false)}>Cancel</button>
+                <button type="button" className="danger btn-clear" onClick={handleClear}>Clear</button>
               </div>
             </motion.div>
           </motion.div>
