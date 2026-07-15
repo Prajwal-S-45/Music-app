@@ -1,184 +1,177 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Clock3, Flame, Heart, History, Mic2, MoreVertical, Music4, Play, Search as SearchIcon } from 'lucide-react';
+import {
+  Album,
+  ChevronRight,
+  Clock3,
+  Disc3,
+  Film,
+  Flame,
+  History,
+  Mic2,
+  MoreVertical,
+  Music4,
+  Play,
+  Podcast,
+  Search as SearchIcon,
+  Sparkles,
+} from 'lucide-react';
 import apiClient from '../api/client';
 import '../styles/SearchDropdown2.css';
 
-
 let searchDropdownCooldownUntil = 0;
 const MIN_SEARCH_LENGTH = 2;
-const DEBOUNCE_MS = 450;
-
-const sanitizeQuery = (value) => {
-  return String(value || '')
-    .replace(/[\u0000-\u001F\u007F]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
-
+const DEBOUNCE_MS = 300;
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=400&q=80';
 
-function normalizeSong(song, index) {
-  const id = song?.videoId || song?.id || `${song?.title || 'song'}-${index}`;
+const SECTION_CONFIG = [
+  { key: 'topResults', title: 'Top Results', type: 'all', icon: Sparkles },
+  { key: 'albums', title: 'Albums', type: 'albums', icon: Album },
+  { key: 'songs', title: 'Songs', type: 'songs', icon: Music4 },
+  { key: 'artists', title: 'Artists', type: 'artists', icon: Mic2, roundImage: true },
+  { key: 'playlists', title: 'Playlists', type: 'playlists', icon: Disc3 },
+  { key: 'podcasts', title: 'Podcasts', type: 'podcasts', icon: Podcast },
+  { key: 'movies', title: 'Movies', type: 'movies', icon: Film },
+];
 
-  return {
-    ...song,
-    id,
-    videoId: id,
-    title: song?.title || 'Untitled Track',
-    artist: song?.channelTitle || song?.artist || 'Unknown Artist',
-    album: song?.album || '',
-    thumbnail: song?.thumbnail || song?.cover || song?.image || FALLBACK_IMAGE,
-    source: song?.source || 'youtube',
-  };
-}
+const emptyGrouped = {
+  query: '',
+  topResults: [],
+  albums: [],
+  songs: [],
+  artists: [],
+  playlists: [],
+  podcasts: [],
+  movies: [],
+};
 
-function loadRecentSearches() {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem('recentSearches');
-    const parsed = stored ? JSON.parse(stored) : [];
-    return Array.isArray(parsed) ? parsed.filter(Boolean).slice(0, 6) : [];
-  } catch {
-    return [];
+const sanitizeQuery = (value) => String(value || '')
+  .replace(/[\u0000-\u001F\u007F]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const getItemTitle = (item) => item?.title || item?.name || 'Untitled';
+const getItemImage = (item) => item?.thumbnail || item?.cover || item?.image || item?.photo || item?.poster || FALLBACK_IMAGE;
+
+const formatDuration = (seconds) => {
+  const value = Number(seconds) || 0;
+  if (!value) return 'Preview';
+  const mins = Math.floor(value / 60);
+  const secs = Math.floor(value % 60);
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+};
+
+const itemSubtitle = (item) => {
+  switch (item?.type) {
+    case 'song':
+      return [item.movieName || item.album, item.singer || item.artist, formatDuration(item.duration)].filter(Boolean).join(' | ');
+    case 'album':
+      return [item.year, item.composer, item.language].filter(Boolean).join(' | ') || 'Album';
+    case 'artist':
+      return item.profession || 'Artist';
+    case 'playlist':
+      return [`${item.songCount || 0} songs`, item.creator].filter(Boolean).join(' | ') || 'Playlist';
+    case 'podcast':
+      return [item.season, item.host].filter(Boolean).join(' | ') || 'Podcast';
+    case 'movie':
+      return [item.year, item.language, `${item.songCount || 0} songs`].filter(Boolean).join(' | ');
+    default:
+      return item?.subtitle || item?.artist || item?.type || 'Result';
   }
-}
+};
 
-function mapUnique(items, keyFn, mapFn, limit) {
-  const store = new Map();
-  items.forEach((item, index) => {
-    const key = keyFn(item, index);
-    if (!key || store.has(key)) return;
-    store.set(key, mapFn(item, index));
-  });
-  return Array.from(store.values()).slice(0, limit);
-}
-
-function buildSections(rawItems) {
-  const songs = rawItems.map(normalizeSong);
-
-  const topResult = songs.slice(0, 4).map((song) => ({
-    ...song,
-    subtitle: `${song.artist}${song.album ? ` · ${song.album}` : ''}`,
-    type: 'song',
-  }));
-
-  const albums = mapUnique(
-    songs,
-    (song) => `${song.album || `${song.artist} Collection`}::${song.artist}`,
-    (song, index) => ({
-      id: `album-${song.id}-${index}`,
-      title: song.album || `${song.artist} Collection`,
-      subtitle: `${song.artist}`,
-      thumbnail: song.thumbnail,
-      query: `${song.album || song.artist} album`,
-      type: 'album',
-    }),
-    3
-  );
-
-  const artists = mapUnique(
-    songs,
-    (song) => song.artist,
-    (song, index) => ({
-      id: `artist-${song.artist}-${index}`,
-      title: song.artist,
-      subtitle: 'Artist',
-      thumbnail: song.thumbnail,
-      query: song.artist,
-      type: 'artist',
-    }),
-    3
-  );
-
-  const songItems = songs.slice(0, 3).map((song) => ({
-    ...song,
-    subtitle: song.artist,
-    query: `${song.title} ${song.artist}`,
-    type: 'song',
-  }));
-
-  const playlistCandidates = songs
-    .filter((song) => /playlist|mix|session/i.test(song.title))
-    .map((song, index) => ({
-      id: `playlist-${song.id}-${index}`,
-      title: song.title,
-      subtitle: `Playlist · ${song.artist}`,
-      thumbnail: song.thumbnail,
-      query: `${song.title} playlist`,
-      type: 'song',
-    }));
-
-  const playlists = playlistCandidates.length
-    ? playlistCandidates.slice(0, 3)
-    : artists.slice(0, 3).map((artist, index) => ({
-        id: `playlist-fallback-${artist.id}-${index}`,
-        title: `${artist.title} Mix`,
-        subtitle: 'Playlist',
-        thumbnail: artist.thumbnail,
-        query: `${artist.title} playlist`,
-        type: 'artist',
-      }));
-
-  const podcastCandidates = songs
-    .filter((song) => /podcast|episode|talk|interview/i.test(song.title))
-    .map((song, index) => ({
-      id: `podcast-${song.id}-${index}`,
-      title: song.title,
-      subtitle: `Podcast · ${song.artist}`,
-      thumbnail: song.thumbnail,
-      query: `${song.title} podcast`,
-      type: 'song',
-    }));
-
-  const podcasts = podcastCandidates.length
-    ? podcastCandidates.slice(0, 3)
-    : artists.slice(0, 3).map((artist, index) => ({
-        id: `podcast-fallback-${artist.id}-${index}`,
-        title: `${artist.title} Talks`,
-        subtitle: 'Podcast',
-        thumbnail: artist.thumbnail,
-        query: `${artist.title} podcast`,
-        type: 'artist',
-      }));
+const normalizeGroupedPayload = (payload) => {
+  const data = payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+    ? payload.data
+    : payload;
 
   return {
-    topResult,
-    albums,
-    songs: songItems,
-    artists,
-    playlists,
-    podcasts,
+    ...emptyGrouped,
+    ...data,
+    topResults: Array.isArray(data?.topResults) ? data.topResults : [],
+    albums: Array.isArray(data?.albums) ? data.albums : [],
+    songs: Array.isArray(data?.songs) ? data.songs : [],
+    artists: Array.isArray(data?.artists) ? data.artists : [],
+    playlists: Array.isArray(data?.playlists) ? data.playlists : [],
+    podcasts: Array.isArray(data?.podcasts) ? data.podcasts : [],
+    movies: Array.isArray(data?.movies) ? data.movies : [],
   };
+};
+
+function SearchSkeleton() {
+  return (
+    <div className="sd2__grid">
+      {SECTION_CONFIG.map((section) => (
+        <section key={section.key} className="sd2-section">
+          <div className="sd2-skeleton-title" />
+          {[0, 1, 2].map((item) => <div key={item} className="sd2-skeleton-row" />)}
+        </section>
+      ))}
+    </div>
+  );
 }
 
-/* ─── Compact list section ─── */
-function CompactListSection({ title, items, onSelect, showViewAll, onViewAll, icon: Icon, kind = 'square' }) {
+function SearchEmptyState({ message }) {
+  return (
+    <div className="sd2__empty">
+      <SearchIcon size={22} />
+      <strong>No results found</strong>
+      <span>{message || 'Try a song, artist, album, playlist, podcast, or movie.'}</span>
+    </div>
+  );
+}
+
+function SearchSection({ section, items, activeId, onSelect, onHover, onViewAll }) {
   if (!items.length) return null;
+  const Icon = section.icon;
 
   return (
-    <section className={`sd2-section sd2-section--${kind}`}>
+    <section className="sd2-section">
       <div className="sd2-section__head">
-        <h4 className="sd2-section__title">{title}</h4>
-        {showViewAll && (
-          <button type="button" className="sd2-viewall" onClick={onViewAll}>
-            View All
-          </button>
-        )}
+        <h4 className="sd2-section__title"><Icon size={14} /> {section.title}</h4>
+        <button type="button" className="sd2-viewall" onMouseDown={(event) => event.preventDefault()} onClick={() => onViewAll(section.type)}>
+          View All <ChevronRight size={12} />
+        </button>
       </div>
       <div className="sd2-section__list">
-        {items.slice(0, 3).map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className="sd2-row"
-            onClick={() => onSelect(item)}
-          >
-            <img src={item.thumbnail} alt={item.title} loading="lazy" className="sd2-row__img" />
-            <div className="sd2-row__meta">
-              <span className="sd2-row__name">{item.title}</span>
-              <span className="sd2-row__sub">{item.subtitle}</span>
-            </div>
+        {items.slice(0, 3).map((item, index) => {
+          const id = `${section.key}-${item.id || getItemTitle(item)}-${index}`;
+          const isActive = activeId === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              data-result-id={id}
+              className={`sd2-row ${isActive ? 'is-active' : ''}`}
+              onMouseEnter={() => onHover(id)}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onSelect(item, section.type)}
+            >
+              <img src={getItemImage(item)} alt={getItemTitle(item)} loading="lazy" className={`sd2-row__img ${section.roundImage ? 'sd2-row__img--round' : ''}`} />
+              <div className="sd2-row__meta">
+                <span className="sd2-row__name">{getItemTitle(item)}</span>
+                <span className="sd2-row__sub">{itemSubtitle(item)}</span>
+              </div>
+              {item.type === 'song' && <Play size={13} className="sd2-row__quick" />}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SearchRecent({ recentSearches, onSelect }) {
+  if (!recentSearches.length) return null;
+  return (
+    <section className="sd2-browse-panel">
+      <div className="sd2-section__head">
+        <h4 className="sd2-section__title"><History size={14} /> Recent Searches</h4>
+      </div>
+      <div className="sd2-chip-list">
+        {recentSearches.slice(0, 6).map((item) => (
+          <button key={item} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect({ title: item, query: item }, 'songs')}>
+            <Clock3 size={13} /> {item}
           </button>
         ))}
       </div>
@@ -186,117 +179,82 @@ function CompactListSection({ title, items, onSelect, showViewAll, onViewAll, ic
   );
 }
 
-/* ─── Top Result panel ─── */
-function TopResultPanel({ item, onSelect, onPlay, onLike, onMore }) {
-  if (!item) return null;
-
-  const handleCardKeyDown = (event) => {
-    if (event.target !== event.currentTarget) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onSelect(item);
-    }
-  };
-
-  const stopProp = (event, cb) => {
-    event.stopPropagation();
-    cb?.(item);
-  };
-
+function SearchTrending({ trendingResults, onSelect }) {
+  const items = trendingResults.slice(0, 6);
+  if (!items.length) return null;
   return (
-    <section className="sd2-section sd2-section--top">
+    <section className="sd2-browse-panel sd2-browse-panel--wide">
       <div className="sd2-section__head">
-        <h4 className="sd2-section__title">Top Result</h4>
+        <h4 className="sd2-section__title"><Flame size={14} /> Trending Searches</h4>
       </div>
-      <div
-        role="button"
-        tabIndex={0}
-        className="sd2-top-card"
-        onClick={() => onSelect(item)}
-        onKeyDown={handleCardKeyDown}
-      >
-        <span className="sd2-top-card__bg" style={{ backgroundImage: `url(${item.thumbnail})` }} />
-        <img src={item.thumbnail} alt={item.title} loading="lazy" className="sd2-top-card__img" />
-        <div className="sd2-top-card__info">
-          <span className="sd2-top-card__label">Song</span>
-          <strong className="sd2-top-card__name">{item.title}</strong>
-          <small className="sd2-top-card__sub">{item.subtitle}</small>
-          <div className="sd2-top-card__actions">
-            <button
-              type="button"
-              className="sd2-action sd2-action--play"
-              onClick={(e) => stopProp(e, onPlay)}
-              aria-label={`Play ${item.title}`}
-            >
-              <Play size={14} fill="currentColor" strokeWidth={0} />
-            </button>
-            <button
-              type="button"
-              className="sd2-action sd2-action--like"
-              onClick={(e) => stopProp(e, onLike)}
-              aria-label={`Like ${item.title}`}
-            >
-              <Heart size={14} />
-            </button>
-            <button
-              type="button"
-              className="sd2-action"
-              onClick={(e) => stopProp(e, onMore)}
-              aria-label={`Queue ${item.title}`}
-            >
-              <MoreVertical size={14} />
-            </button>
-          </div>
-        </div>
+      <div className="sd2-trending-grid">
+        {items.map((item, index) => (
+          <button key={`${item.id || item.title}-${index}`} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect(item, 'songs')}>
+            <img src={getItemImage(item)} alt={getItemTitle(item)} loading="lazy" />
+            <span>{getItemTitle(item)}</span>
+          </button>
+        ))}
       </div>
     </section>
   );
 }
 
-/* ─── Main Dropdown ─── */
-function SearchDropdown({ isOpen, query, onClose, onClear, onSearchSelect, onPlayTrack, onLikeTrack, onMoreTrack }) {
-  const [rawResults, setRawResults] = useState([]);
+function loadRecentSearches() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem('recentSearches');
+    const parsed = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed) ? parsed.filter(Boolean).slice(0, 8) : [];
+  } catch {
+    return [];
+  }
+}
+
+function SearchDropdown({ isOpen, query, onClose, onSearchSelect, onPlayTrack }) {
+  const [groupedResults, setGroupedResults] = useState(emptyGrouped);
   const [isLoading, setIsLoading] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState('');
   const [recentSearches, setRecentSearches] = useState([]);
   const [trendingResults, setTrendingResults] = useState([]);
+  const [activeId, setActiveId] = useState('');
   const dropdownRef = useRef(null);
   const lastRequestKeyRef = useRef('');
 
-  const sections = useMemo(() => buildSections(rawResults), [rawResults]);
+  const trimmedQuery = sanitizeQuery(query);
+
+  const visibleSections = useMemo(() => SECTION_CONFIG.map((section) => ({
+    ...section,
+    items: Array.isArray(groupedResults[section.key]) ? groupedResults[section.key].slice(0, 3) : [],
+  })).filter((section) => section.items.length), [groupedResults]);
+
+  const flatItems = useMemo(() => visibleSections.flatMap((section) => section.items.map((item, index) => ({
+    id: `${section.key}-${item.id || getItemTitle(item)}-${index}`,
+    item,
+    type: section.type,
+  }))), [visibleSections]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
-
     setRecentSearches(loadRecentSearches());
 
     let cancelled = false;
     const controller = new AbortController();
-
-    const loadTrending = async () => {
-      try {
-        const response = await apiClient.get('/api/music/trending', {
-          params: { limit: 6 },
-          signal: controller.signal,
-        });
-
-        const results = Array.isArray(response.data?.data)
-          ? response.data.data
-          : Array.isArray(response.data)
-            ? response.data
-            : [];
-
-        if (!cancelled) {
-          setTrendingResults(results.map(normalizeSong));
-        }
-      } catch {
-        if (!cancelled) {
-          setTrendingResults([]);
-        }
-      }
-    };
-
-    loadTrending();
+    apiClient.get('/api/music/trending', { params: { limit: 6 }, signal: controller.signal })
+      .then((response) => {
+        if (cancelled) return;
+        const results = Array.isArray(response.data?.data) ? response.data.data : [];
+        setTrendingResults(results.map((song, index) => ({
+          ...song,
+          id: song.id || song.videoId || `trending-${index}`,
+          type: 'song',
+          title: song.title || 'Trending song',
+          artist: song.artist || song.channelTitle || 'Popular now',
+          thumbnail: song.thumbnail || song.cover || song.image || FALLBACK_IMAGE,
+        })));
+      })
+      .catch(() => {
+        if (!cancelled) setTrendingResults([]);
+      });
 
     return () => {
       cancelled = true;
@@ -305,36 +263,34 @@ function SearchDropdown({ isOpen, query, onClose, onClear, onSearchSelect, onPla
   }, [isOpen]);
 
   useEffect(() => {
-    const trimmedQuery = sanitizeQuery(query);
-
     if (!isOpen) {
-      setRawResults([]);
+      setGroupedResults(emptyGrouped);
       setIsLoading(false);
       setNoticeMessage('');
+      setActiveId('');
       lastRequestKeyRef.current = '';
       return undefined;
     }
 
     if (!trimmedQuery) {
-      setRawResults([]);
+      setGroupedResults(emptyGrouped);
       setIsLoading(false);
       setNoticeMessage('');
+      setActiveId('');
       lastRequestKeyRef.current = '';
       return undefined;
     }
 
     if (trimmedQuery.length < MIN_SEARCH_LENGTH) {
-      setRawResults([]);
+      setGroupedResults(emptyGrouped);
       setIsLoading(false);
       setNoticeMessage(`Type at least ${MIN_SEARCH_LENGTH} characters`);
-      lastRequestKeyRef.current = '';
+      setActiveId('');
       return undefined;
     }
 
     const normalizedRequestKey = trimmedQuery.toLowerCase();
-    if (lastRequestKeyRef.current === normalizedRequestKey) {
-      return undefined;
-    }
+    if (lastRequestKeyRef.current === normalizedRequestKey) return undefined;
 
     if (Date.now() < searchDropdownCooldownUntil) {
       setIsLoading(false);
@@ -349,23 +305,11 @@ function SearchDropdown({ isOpen, query, onClose, onClear, onSearchSelect, onPla
         setNoticeMessage('');
         lastRequestKeyRef.current = normalizedRequestKey;
         const response = await apiClient.get('/api/search', {
-          params: {
-            q: trimmedQuery,
-            limit: 10,
-          },
+          params: { q: trimmedQuery, limit: 12, grouped: true },
           signal: controller.signal,
         });
-
-        const results = Array.isArray(response.data?.data)
-          ? response.data.data
-          : Array.isArray(response.data)
-            ? response.data
-            : [];
-
-        setRawResults(results);
-        if (!results.length) {
-          setNoticeMessage(String(response.data?.warning || '').trim());
-        }
+        setGroupedResults(normalizeGroupedPayload(response.data));
+        setNoticeMessage(String(response.data?.warning || '').trim());
       } catch (error) {
         if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
           lastRequestKeyRef.current = '';
@@ -385,173 +329,97 @@ function SearchDropdown({ isOpen, query, onClose, onClear, onSearchSelect, onPla
       controller.abort();
       window.clearTimeout(timerId);
     };
-  }, [isOpen, query]);
+  }, [isOpen, trimmedQuery]);
+
+  useEffect(() => {
+    if (!flatItems.length) {
+      setActiveId('');
+      return;
+    }
+    setActiveId((current) => current || flatItems[0].id);
+  }, [flatItems]);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        onClose?.();
-      }
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) onClose?.();
     };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handlePointerDown);
-    }
-
+    if (isOpen) document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [isOpen, onClose]);
 
+  const selectItem = (item, type) => {
+    const searchType = item.type === 'movie' ? 'movies' : type;
+    const nextQuery = item.type === 'movie' ? getItemTitle(item) : (item.query || getItemTitle(item));
+    if (item.type === 'song') onPlayTrack?.(item);
+    onSearchSelect?.({ query: nextQuery, title: getItemTitle(item), type: searchType, item });
+  };
+
+  const viewAll = (type) => {
+    if (!trimmedQuery) return;
+    onSearchSelect?.({ query: trimmedQuery, type, viewAll: true });
+  };
+
+  const handleKeyDown = (event) => {
+    if (!flatItems.length && event.key === 'Escape') {
+      onClose?.();
+      return;
+    }
+
+    const currentIndex = Math.max(0, flatItems.findIndex((item) => item.id === activeId));
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveId(flatItems[(currentIndex + 1) % flatItems.length]?.id || '');
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveId(flatItems[(currentIndex - 1 + flatItems.length) % flatItems.length]?.id || '');
+    } else if (event.key === 'Enter') {
+      const active = flatItems[currentIndex];
+      if (active) {
+        event.preventDefault();
+        selectItem(active.item, active.type);
+      }
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose?.();
+    }
+  };
+
   if (!isOpen) return null;
 
-  const selectItem = (item) => {
-    onSearchSelect?.({
-      query: item.query || item.title,
-      title: item.title,
-      type: item.type || 'song',
-    });
-  };
-
-  const onViewAll = () => {
-    onSearchSelect?.({ query: query.trim() });
-  };
-
-  const browseSections = buildSections(trendingResults);
-  const activeSections = query.trim() ? sections : browseSections;
-  const hasAny =
-    activeSections.topResult.length ||
-    activeSections.albums.length ||
-    activeSections.songs.length ||
-    activeSections.artists.length ||
-    activeSections.playlists.length ||
-    activeSections.podcasts.length;
-
-  const hasBrowseState = !query.trim() && (recentSearches.length > 0 || trendingResults.length > 0);
+  const hasAny = flatItems.length > 0;
+  const showBrowse = !trimmedQuery;
 
   return (
-    <div ref={dropdownRef} className="sd2" role="listbox" aria-label="Search results">
-      {isLoading ? (
-        <div className="sd2__loading">
-          <span /><span /><span />
-        </div>
-      ) : (
-        <div className="sd2__body">
-          {query.trim() ? (
-            <div className="sd2__grid">
-              <TopResultPanel
-                item={sections.topResult[0]}
+    <div ref={dropdownRef} className="sd2" role="listbox" aria-label="Search results" tabIndex={-1} onKeyDown={handleKeyDown}>
+      <div className="sd2__body">
+        {showBrowse ? (
+          <div className="sd2__browse">
+            <SearchRecent recentSearches={recentSearches} onSelect={selectItem} />
+            <SearchTrending trendingResults={trendingResults} onSelect={selectItem} />
+          </div>
+        ) : isLoading ? (
+          <SearchSkeleton />
+        ) : hasAny ? (
+          <div className="sd2__grid">
+            {SECTION_CONFIG.map((section) => (
+              <SearchSection
+                key={section.key}
+                section={section}
+                items={groupedResults[section.key] || []}
+                activeId={activeId}
+                onHover={setActiveId}
                 onSelect={selectItem}
-                onPlay={onPlayTrack}
-                onLike={onLikeTrack}
-                onMore={onMoreTrack}
+                onViewAll={viewAll}
               />
-              <CompactListSection
-                title="Albums"
-                icon={Music4}
-                items={sections.albums}
-                onSelect={selectItem}
-                showViewAll
-                onViewAll={onViewAll}
-              />
-              <CompactListSection
-                title="Songs"
-                icon={SearchIcon}
-                items={sections.songs}
-                onSelect={selectItem}
-                showViewAll
-                onViewAll={onViewAll}
-              />
-              <CompactListSection
-                title="Artists"
-                icon={Mic2}
-                kind="artist"
-                items={sections.artists}
-                onSelect={selectItem}
-                showViewAll
-                onViewAll={onViewAll}
-              />
-              <CompactListSection
-                title="Playlists"
-                icon={Clock3}
-                items={sections.playlists}
-                onSelect={selectItem}
-                showViewAll
-                onViewAll={onViewAll}
-              />
-              <CompactListSection
-                title="Podcasts"
-                icon={History}
-                items={sections.podcasts}
-                onSelect={selectItem}
-                showViewAll
-                onViewAll={onViewAll}
-              />
-            </div>
-          ) : (
-            <div className="sd2__grid sd2__grid--browse">
-              <CompactListSection
-                title="Recent Searches"
-                icon={History}
-                items={recentSearches.map((item, index) => ({
-                  id: `recent-${index}-${item}`,
-                  title: item,
-                  subtitle: 'Recent search',
-                  thumbnail: FALLBACK_IMAGE,
-                  query: item,
-                  type: 'song',
-                }))}
-                onSelect={selectItem}
-                showViewAll={false}
-              />
-              <CompactListSection
-                title="Trending Songs"
-                icon={Flame}
-                items={browseSections.songs}
-                onSelect={selectItem}
-                showViewAll={false}
-              />
-              <CompactListSection
-                title="Trending Now"
-                icon={Flame}
-                items={browseSections.topResult}
-                onSelect={selectItem}
-                showViewAll={false}
-              />
-              <CompactListSection
-                title="Popular Artists"
-                icon={Mic2}
-                kind="artist"
-                items={browseSections.artists}
-                onSelect={selectItem}
-                showViewAll={false}
-              />
-              <CompactListSection
-                title="Albums"
-                icon={Music4}
-                items={browseSections.albums}
-                onSelect={selectItem}
-                showViewAll={false}
-              />
-              <CompactListSection
-                title="Popular Playlists"
-                icon={Clock3}
-                items={browseSections.playlists}
-                onSelect={selectItem}
-                showViewAll={false}
-              />
-            </div>
-          )}
+            ))}
+          </div>
+        ) : (
+          <SearchEmptyState message={noticeMessage} />
+        )}
 
-          {!hasAny && (
-            <div className="sd2__empty">
-              {noticeMessage || (hasBrowseState ? 'Start typing to search across songs, artists, and albums.' : 'No results found')}
-            </div>
-          )}
-
-          {hasAny && noticeMessage && (
-            <div className="sd2__empty">{noticeMessage}</div>
-          )}
-        </div>
-      )}
+        {hasAny && noticeMessage ? <div className="sd2__notice">{noticeMessage}</div> : null}
+        <div className="sd2__kbd-hint">Use arrow keys to move, Enter to open, Esc to close</div>
+      </div>
     </div>
   );
 }
