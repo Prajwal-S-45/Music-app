@@ -169,18 +169,26 @@ function Search({ token, activeTrackId, onPlayTrack, onQueueTrack, onLikeUpdate,
           ? response.data
           : [];
 
-      const nextResults = rawResults.map((song) => ({
-        ...song,
-        id: song.videoId || song.id,
-        videoId: song.videoId || song.id,
-        title: song.title || 'Untitled Track',
-        artist: song.artist || song.channelTitle || 'Unknown Channel',
-        album: song.album || null,
-        cover: song.thumbnail || song.cover || song.image || FALLBACK_IMAGE,
-        duration: Number(song.duration) || 0,
-        source: 'youtube',
-        playable: Boolean(song.videoId || song.id),
-      }));
+      const nextResults = rawResults.map((song) => {
+        const isJioSaavn = song.source === 'jiosaavn' || song.source === 'mock-fallback' || song.file_url;
+        const trackId = song.id || song.videoId;
+        return {
+          ...song,
+          id: trackId,
+          videoId: isJioSaavn ? null : (song.videoId || trackId),
+          title: song.title || 'Untitled Track',
+          artist: song.artist || song.channelTitle || 'Unknown Channel',
+          album: song.album || null,
+          cover: song.cover || song.thumbnail || song.image || FALLBACK_IMAGE,
+          thumbnail: song.cover || song.thumbnail || song.image || FALLBACK_IMAGE,
+          duration: Number(song.duration) || 0,
+          source: song.source || 'jiosaavn',
+          file_url: song.file_url || '',
+          streamUrl: isJioSaavn ? (song.file_url || song.streamUrl || '') : null,
+          playable: Boolean(trackId),
+        };
+      });
+
 
       setResults(nextResults);
       setSearched(true);
