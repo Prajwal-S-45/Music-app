@@ -150,7 +150,7 @@ function PlayerBar({
         );
         setIsLiked(found);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
       active = false;
@@ -341,7 +341,6 @@ function PlayerBar({
         <audio
           ref={audioRef}
           src={resolvedStreamUrl}
-          autoPlay
           onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
           onDurationChange={() => setDuration(audioRef.current?.duration || 0)}
           onEnded={handleAudioEnded}
@@ -427,7 +426,7 @@ function PlayerBar({
             <div className="player-fullscreen-info-wrapper">
               <div className="player-fullscreen-info">
                 <div className="player-fullscreen-title">
-                  <h2>{cleanSongTitle(track.title)}</h2>
+                  <h2>{track.title}</h2>
                   <p>{track.artist || track.channelTitle || 'Unknown Artist'}</p>
                 </div>
                 <div className="player-fullscreen-actions-right">
@@ -694,161 +693,161 @@ function PlayerBar({
 
 
 
-      <motion.footer
-        className="player-bar-wrapper"
-        initial={{ y: '100%', opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: '100%', opacity: 0 }}
-        transition={{ type: 'spring', damping: 24, stiffness: 200 }}
-      >
-        <div className="player-bar">
-          <div className="player-bar__body">
-            {/* LEFT SECTION: Track Info */}
-            <div className="player-bar__left" onClick={() => track && setIsFullScreen(true)}>
-              <div className="player-bar__art-wrap">
-                <motion.img
-                  animate={isPlaying ? { scale: [1, 1.02, 1] } : { scale: 1 }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  src={track?.cover || track?.image || track?.thumbnail || FALLBACK_IMAGE}
-                  alt={track?.title}
-                  onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
-                />
-                {isPlaying && (
-                  <div className="player-bar__playback-indicator">
-                    <div className="bar" />
-                    <div className="bar" />
-                    <div className="bar" />
-                  </div>
-                )}
-              </div>
-
-              <div className="player-bar__info">
-                <div className="player-bar__song-row">
-                  <strong className="song-name" title={track?.title}>
-                    {cleanSongTitle(track?.title) || 'Not Playing'}
-                  </strong>
-                  <motion.button
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
-                    className={`player-bar__heart ${isLiked ? 'active' : ''}`}
-                    onClick={handleLikeCurrentTrack}
-                    disabled={!track || !token}
-                    aria-label={isLiked ? 'Track liked' : 'Like current track'}
-                  >
-                    <Heart size={16} fill={isLiked ? 'var(--accent)' : 'none'} />
-                  </motion.button>
-                </div>
-                <span className="album-name" title={resolvedAlbumName}>
-                  {resolvedAlbumName}
-                </span>
-                <span className="artist-name" title={track?.artist}>
-                  {track?.artist || track?.channelTitle || 'Unknown Artist'}
-                </span>
-              </div>
+<motion.footer
+  className="player-bar-wrapper"
+  initial={{ y: '100%', opacity: 0 }}
+  animate={{ y: 0, opacity: 1 }}
+  exit={{ y: '100%', opacity: 0 }}
+  transition={{ type: 'spring', damping: 24, stiffness: 200 }}
+>
+  <div className="player-bar">
+    <div className="player-bar__body">
+      {/* LEFT SECTION: Track Info */}
+      <div className="player-bar__left" onClick={() => track && setIsFullScreen(true)}>
+        <div className="player-bar__art-wrap">
+          <motion.img
+            animate={isPlaying ? { scale: [1, 1.02, 1] } : { scale: 1 }}
+            transition={{ duration: 2, repeat: Infinity }}
+            src={track?.cover || track?.image || track?.thumbnail || FALLBACK_IMAGE}
+            alt={track?.title}
+            onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }}
+          />
+          {isPlaying && (
+            <div className="player-bar__playback-indicator">
+              <div className="bar" />
+              <div className="bar" />
+              <div className="bar" />
             </div>
+          )}
+        </div>
 
-            {/* CENTER SECTION: Controls & Progress */}
-            <div className="player-bar__center">
-              <div className="player-bar__controls">
-                <motion.button
-                  whileHover={{ scale: 1.15 }}
-                  className={`player-bar__btn-ghost ${isShuffle ? 'active' : ''}`}
-                  onClick={() => setIsShuffle(!isShuffle)}
-                >
-                  <Shuffle size={16} />
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.15 }}
-                  className="player-bar__btn-ghost"
-                  onClick={handlePrevious}
-                >
-                  <SkipBack size={20} />
-                </motion.button>
-
-                <button className="mobile-only-icon" aria-label="Cast to device" type="button" style={{ color: '#a7a7a7' }}>
-                  <Cast size={20} />
-                </button>
-
-                <motion.button
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="player-bar__btn-play"
-                  onClick={handleTogglePlay}
-                >
-                  {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="play-icon-offset" />}
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.15 }}
-                  className="player-bar__btn-ghost"
-                  onClick={handleNext}
-                >
-                  <SkipForward size={20} />
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.15 }}
-                  className={`player-bar__btn-ghost ${isRepeat ? 'active' : ''}`}
-                  onClick={() => setIsRepeat(!isRepeat)}
-                >
-                  <Repeat size={16} />
-                </motion.button>
-              </div>
-
-              <div className="player-bar__progress-container">
-                <span className="time-label">{formatTime(currentTime)}</span>
-                <div className="player-bar__progress-rail">
-                  <input
-                    type="range"
-                    min="0"
-                    max={Math.max(duration, 1)}
-                    step="1"
-                    value={Math.min(currentTime, Math.max(duration, 1))}
-                    onChange={handleSeek}
-                    style={progressStyle}
-                  />
-                </div>
-                <span className="time-label">{formatTime(duration)}</span>
-              </div>
-            </div>
-
-            {/* RIGHT SECTION: Utils */}
-            <div className="player-bar__right">
-              <div className="player-bar__volume-group">
-                <Volume2 size={18} className="vol-icon" />
-                <div className="volume-slider-container">
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={volume}
-                    onChange={(e) => setVolume(Number(e.target.value))}
-                  />
-                </div>
-              </div>
-
-              <motion.button
-                whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.08)' }}
-                className={`player-bar__btn-util ${isQueueOpen ? 'active' : ''}`}
-                onClick={() => onToggleQueue?.()}
-              >
-                <ListMusic size={18} />
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.08)' }}
-                className="player-bar__btn-util"
-                onClick={() => track && setIsFullScreen(true)}
-                title="Expand to Full Screen"
-              >
-                <Expand size={18} />
-              </motion.button>
+        <div className="player-bar__info">
+          <div className="player-bar__song-row">
+            <strong className="song-name" title={track?.title}>
+              {cleanSongTitle(track?.title) || 'Not Playing'}
+            </strong>
+            <motion.button
+              whileHover={{ scale: 1.2 }}
+              whileTap={{ scale: 0.9 }}
+              className={`player-bar__heart ${isLiked ? 'active' : ''}`}
+              onClick={handleLikeCurrentTrack}
+              disabled={!track || !token}
+              aria-label={isLiked ? 'Track liked' : 'Like current track'}
+            >
+              <Heart size={16} fill={isLiked ? 'var(--accent)' : 'none'} />
+            </motion.button>
           </div>
+          <span className="album-name" title={resolvedAlbumName}>
+            {resolvedAlbumName}
+          </span>
+          <span className="artist-name" title={track?.artist}>
+            {track?.artist || track?.channelTitle || 'Unknown Artist'}
+          </span>
+        </div>
+      </div>
+
+      {/* CENTER SECTION: Controls & Progress */}
+      <div className="player-bar__center">
+        <div className="player-bar__controls">
+          <motion.button
+            whileHover={{ scale: 1.15 }}
+            className={`player-bar__btn-ghost ${isShuffle ? 'active' : ''}`}
+            onClick={() => setIsShuffle(!isShuffle)}
+          >
+            <Shuffle size={16} />
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.15 }}
+            className="player-bar__btn-ghost"
+            onClick={handlePrevious}
+          >
+            <SkipBack size={20} />
+          </motion.button>
+
+          <button className="mobile-only-icon" aria-label="Cast to device" type="button" style={{ color: '#a7a7a7' }}>
+            <Cast size={20} />
+          </button>
+
+          <motion.button
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.95 }}
+            className="player-bar__btn-play"
+            onClick={handleTogglePlay}
+          >
+            {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="play-icon-offset" />}
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.15 }}
+            className="player-bar__btn-ghost"
+            onClick={handleNext}
+          >
+            <SkipForward size={20} />
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.15 }}
+            className={`player-bar__btn-ghost ${isRepeat ? 'active' : ''}`}
+            onClick={() => setIsRepeat(!isRepeat)}
+          >
+            <Repeat size={16} />
+          </motion.button>
+        </div>
+
+        <div className="player-bar__progress-container">
+          <span className="time-label">{formatTime(currentTime)}</span>
+          <div className="player-bar__progress-rail">
+            <input
+              type="range"
+              min="0"
+              max={Math.max(duration, 1)}
+              step="1"
+              value={Math.min(currentTime, Math.max(duration, 1))}
+              onChange={handleSeek}
+              style={progressStyle}
+            />
+          </div>
+          <span className="time-label">{formatTime(duration)}</span>
+        </div>
+      </div>
+
+      {/* RIGHT SECTION: Utils */}
+      <div className="player-bar__right">
+        <div className="player-bar__volume-group">
+          <Volume2 size={18} className="vol-icon" />
+          <div className="volume-slider-container">
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+            />
           </div>
         </div>
-      </motion.footer>
+
+        <motion.button
+          whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.08)' }}
+          className={`player-bar__btn-util ${isQueueOpen ? 'active' : ''}`}
+          onClick={() => onToggleQueue?.()}
+        >
+          <ListMusic size={18} />
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.08)' }}
+          className="player-bar__btn-util"
+          onClick={() => track && setIsFullScreen(true)}
+          title="Expand to Full Screen"
+        >
+          <Expand size={18} />
+        </motion.button>
+      </div>
+    </div>
+  </div>
+</motion.footer>
     </>
   );
 }
