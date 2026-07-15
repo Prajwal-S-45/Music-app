@@ -58,8 +58,10 @@ function SuggestionsSection({ recentSearches = [], onSearch }) {
 }
 
 function PremiumSongRow({ song, isActive, onPlayTrack, onLikeTrack, onQueueTrack, isLiked }) {
-  const playCount = Math.floor(Math.random() * 900 + 100) + 'M';
-  
+  const playCount = useMemo(() => {
+    return Math.floor(Math.random() * 900 + 100) + 'M';
+  }, [song.id, song.videoId, song.title]);
+
   return (
     <motion.article
       className={`premium-song-row group ${isActive ? 'is-active' : ''}`}
