@@ -153,11 +153,11 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
   };
 
   const handleSearchSelect = (result) => {
-    const nextQuery = String(result?.title || result?.query || '').trim();
+    const nextQuery = String(result?.query || result?.title || '').trim();
     if (!nextQuery) return;
     setDropdownOpen(false);
     setSearchFocused(false);
-    onSearchSubmit?.(nextQuery);
+    onSearchSubmit?.({ query: nextQuery, type: result?.type || 'songs' });
     setQuery('');
   };
 
@@ -295,13 +295,13 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
                 }}
                 aria-label="Clear search"
               >
-                ✕
+                âœ•
               </button>
             )}
           </form>
 
           <AnimatePresence>
-            {searchExpanded && searchFocused && !query.trim() && (
+            {false && searchExpanded && searchFocused && !query.trim() && (
               <motion.div
                 className="app-header__recent-searches"
                 initial={{ opacity: 0, y: 12, scale: 0.96 }}
@@ -323,7 +323,7 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
           </AnimatePresence>
 
           <SearchDropdown
-            isOpen={dropdownOpen && Boolean(query.trim())}
+            isOpen={dropdownOpen}
             query={query}
             onClose={() => { setDropdownOpen(false); setSearchExpanded(false); }}
             onClear={() => { setQuery(''); setDropdownOpen(false); setSearchExpanded(false); }}
