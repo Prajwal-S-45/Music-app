@@ -1,8 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Clock3, ListPlus, MoreHorizontal, Play, RefreshCw, Search, Shuffle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ChevronLeft,
+  Clock3,
+  Download,
+  Heart,
+  ListPlus,
+  MoreVertical,
+  Play,
+  RefreshCw,
+  Search,
+  Shuffle,
+  SlidersHorizontal
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import apiClient from '../api/client';
 import { normalizeDisplaySong } from '../utils/songPayload';
+import likedSongsBg from '../assets/liked_songs_bg.jpg';
 import '../styles/LikedSongs.css';
 
 const FALLBACK_IMAGE =
@@ -17,7 +31,7 @@ const formatDuration = (seconds) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-const cleanYouTubeTitle = (value) => {
+const cleanJioSaavnTitle = (value) => {
   return String(value || 'Untitled Track')
     .replace(/\s*\([^)]*(official|video|audio|lyrical|lyrics|full song|song|4k|hd)[^)]*\)/gi, '')
     .replace(/\s*\[[^\]]*(official|video|audio|lyrical|lyrics|full song|song|4k|hd)[^\]]*\]/gi, '')
@@ -63,7 +77,8 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
 };
 
-function LikedSongs({ token, refreshSignal, userName = 'Listener', onPlayTrack, onQueueTrack }) {
+function LikedSongs({ token, refreshSignal, userName = 'Listener', onPlayTrack, onQueueTrack, onPlayAll, onLikeUpdate }) {
+  const navigate = useNavigate();
   const [likedSongs, setLikedSongs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -111,15 +126,26 @@ function LikedSongs({ token, refreshSignal, userName = 'Listener', onPlayTrack, 
     });
   }, [likedSongs, searchValue]);
 
-  const totalDuration = useMemo(() => formatTotalDuration(likedSongs), [likedSongs]);
-  const heroImage = likedSongs[0]?.thumbnail || likedSongs[0]?.cover || FALLBACK_IMAGE;
   const songCountLabel = `${likedSongs.length} ${likedSongs.length === 1 ? 'song' : 'songs'}`;
-  const userInitial = String(userName || 'L').trim().charAt(0).toUpperCase();
 
-  const handleShuffleAll = () => {
+  const handlePlayAll = () => {
     if (filteredSongs.length === 0) return;
-    const index = Math.floor(Math.random() * filteredSongs.length);
-    onPlayTrack?.(filteredSongs[index]);
+    onPlayAll?.(filteredSongs);
+  };
+
+  const handleUnlike = async (songId) => {
+    if (!token) return;
+    try {
+      await apiClient.delete(`/api/music/like/${songId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Refresh local list
+      fetchLikedSongs();
+      // Notify parent to refresh globally
+      onLikeUpdate?.();
+    } catch (err) {
+      console.error('Failed to unlike song:', err);
+    }
   };
 
   return (
@@ -131,55 +157,72 @@ function LikedSongs({ token, refreshSignal, userName = 'Listener', onPlayTrack, 
     >
       <div className="liked-page__noise" aria-hidden="true" />
 
-      <motion.header className="liked-hero" variants={itemVariants}>
-        <motion.button
+      {/* Mobile Top Navigation Bar */}
+      <div className="liked-mobile-topbar">
+        <button
           type="button"
-          className="liked-hero__artwork"
-          onClick={handleShuffleAll}
-          whileHover={{ scale: 1.035 }}
-          whileTap={{ scale: 0.98 }}
-          aria-label="Shuffle liked songs"
+          className="liked-mobile-topbar__btn"
+          onClick={() => navigate(-1)}
+          aria-label="Go back"
         >
-          <img
-            src={heroImage}
-            alt="Liked Songs playlist artwork"
-            onError={(event) => {
-              event.currentTarget.onerror = null;
-              event.currentTarget.src = FALLBACK_IMAGE;
-            }}
-          />
-          <span>
-            <Play size={34} fill="currentColor" />
-          </span>
-        </motion.button>
+          <ChevronLeft size={24} />
+        </button>
+        <button
+          type="button"
+          className="liked-mobile-topbar__btn"
+          aria-label="More options"
+        >
+          <MoreVertical size={24} />
+        </button>
+      </div>
 
+      {/* Hero Header with background illustration */}
+      <motion.header
+        className="liked-hero"
+        variants={itemVariants}
+        style={{ backgroundImage: `url(${likedSongsBg})` }}
+      >
         <div className="liked-hero__content">
-          <span className="liked-hero__label">Playlist</span>
           <h1>Liked Songs</h1>
-          <p>Your private collection of saved tracks, ready for every mood.</p>
-          <div className="liked-hero__meta">
-            <span className="liked-hero__avatar">{userInitial}</span>
-            <strong>{userName}</strong>
+          <p className="liked-hero__desc">All the songs you love.</p>
+          
+          <div className="liked-hero__metadata">
+            <Heart size={14} fill="#8B5CF6" stroke="#8B5CF6" />
             <span>{songCountLabel}</span>
-            <span>{totalDuration}</span>
+          </div>
+
+          <div className="liked-hero__actions">
+            <button
+              type="button"
+              className="liked-play-all-btn"
+              onClick={handlePlayAll}
+              disabled={filteredSongs.length === 0}
+            >
+              <Play size={18} fill="currentColor" />
+              <span>Play All</span>
+            </button>
+            <button
+              type="button"
+              className="liked-download-btn"
+              aria-label="Download all"
+            >
+              <Download size={18} />
+            </button>
+            <button
+              type="button"
+              className="liked-filters-btn"
+              aria-label="Filters and options"
+            >
+              <SlidersHorizontal size={18} />
+            </button>
+            <span className="liked-hero__meta-count">{songCountLabel}</span>
           </div>
         </div>
       </motion.header>
 
+      {/* Search Bar */}
       <motion.div className="liked-toolbar" variants={itemVariants}>
         <div className="liked-toolbar__actions">
-          <motion.button
-            type="button"
-            className="liked-button liked-button--primary"
-            onClick={handleShuffleAll}
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
-            disabled={filteredSongs.length === 0}
-          >
-            <Shuffle size={18} />
-            <span>Shuffle All</span>
-          </motion.button>
-
           <motion.button
             type="button"
             className="liked-button liked-button--glass"
@@ -203,14 +246,16 @@ function LikedSongs({ token, refreshSignal, userName = 'Listener', onPlayTrack, 
         </label>
       </motion.div>
 
+      {/* Song List container */}
       <motion.div className="liked-list-shell" variants={itemVariants}>
         <div className="liked-list-head">
-          <span>#</span>
-          <span>Title</span>
-          <span>Album</span>
-          <span><Clock3 size={16} /></span>
-          <span />
-          <span />
+          <span className="liked-list-head__index">#</span>
+          <span className="liked-list-head__heart" />
+          <span className="liked-list-head__title">Title</span>
+          <span className="liked-list-head__artist">Artist</span>
+          <span className="liked-list-head__album">Album</span>
+          <span className="liked-list-head__duration"><Clock3 size={16} /></span>
+          <span className="liked-list-head__actions" />
         </div>
 
         {loading ? (
@@ -236,59 +281,63 @@ function LikedSongs({ token, refreshSignal, userName = 'Listener', onPlayTrack, 
                 whileHover={{ y: -2 }}
               >
                 <span className="liked-card__index">{index + 1}</span>
+                
                 <button
                   type="button"
-                  className="liked-card__art"
-                  onClick={() => onPlayTrack?.(song)}
-                  aria-label={`Play ${song.title}`}
+                  className="liked-card__heart"
+                  onClick={() => handleUnlike(song.id)}
+                  aria-label={`Unlike ${song.title}`}
                 >
-                  <img
-                    src={song.thumbnail || song.cover || FALLBACK_IMAGE}
-                    alt={song.title}
-                    onError={(event) => {
-                      event.currentTarget.onerror = null;
-                      event.currentTarget.src = FALLBACK_IMAGE;
-                    }}
-                  />
-                  <span>
-                    <Play size={16} fill="currentColor" />
-                  </span>
+                  <Heart size={16} fill="#a855f7" stroke="#a855f7" />
                 </button>
 
-                <div className="liked-card__body">
-                  <h4>{cleanYouTubeTitle(song.title)}</h4>
+                <div className="liked-card__title-section">
+                  <button
+                    type="button"
+                    className="liked-card__art"
+                    onClick={() => onPlayTrack?.(song)}
+                    aria-label={`Play ${song.title}`}
+                  >
+                    <img
+                      src={song.thumbnail || song.cover || FALLBACK_IMAGE}
+                      alt={song.title}
+                      onError={(event) => {
+                        event.currentTarget.onerror = null;
+                        event.currentTarget.src = FALLBACK_IMAGE;
+                      }}
+                    />
+                    <span className="liked-card__play-overlay">
+                      <Play size={14} fill="currentColor" />
+                    </span>
+                  </button>
+                  <div className="liked-card__title-info">
+                    <h4>{cleanJioSaavnTitle(song.title)}</h4>
+                    <p className="liked-card__subtitle-artists">
+                      {song.artist || 'Unknown Artist'} • {getAlbumName(song)}
+                    </p>
+                  </div>
                 </div>
 
+                <span className="liked-card__artist">{song.artist || 'Unknown Artist'}</span>
                 <span className="liked-card__album">{getAlbumName(song)}</span>
                 <span className="liked-card__duration">{formatDuration(song.duration)}</span>
 
                 <div className="liked-card__actions">
-                  <motion.button
-                    type="button"
-                    onClick={() => onPlayTrack?.(song)}
-                    aria-label={`Play ${song.title}`}
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.94 }}
-                  >
-                    <Play size={16} fill="currentColor" />
-                  </motion.button>
-                  <motion.button
+                  <button
                     type="button"
                     onClick={() => onQueueTrack?.(song)}
                     aria-label={`Add ${song.title} to queue`}
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.94 }}
+                    className="liked-card__action-btn liked-card__queue-btn"
                   >
                     <ListPlus size={16} />
-                  </motion.button>
-                  <motion.button
+                  </button>
+                  <button
                     type="button"
                     aria-label={`More options for ${song.title}`}
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.94 }}
+                    className="liked-card__action-btn"
                   >
-                    <MoreHorizontal size={18} />
-                  </motion.button>
+                    <MoreVertical size={20} />
+                  </button>
                 </div>
               </motion.article>
             ))}
