@@ -444,7 +444,7 @@ function Queue({
           )}
         </div>
 
-        {/* View Full Queue footer */}
+        {/* Save Queue footer */}
         {items.length > 0 && (
           <div className="upnext-panel__footer">
             <button
@@ -452,7 +452,7 @@ function Queue({
               className="upnext-panel__view-all"
               onClick={handleSaveQueue}
             >
-              View Full Queue ({items.length})
+              Save Queue ({items.length})
             </button>
           </div>
         )}
