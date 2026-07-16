@@ -6,11 +6,6 @@
     padding-left: 0 !important;
   }
 
-  /* Pad the scrollable content area to make room for the sidebar in the first grid column */
-  .dashboard-scroll {
-    padding-left: 80px !important;
-  }
-
 
   /* When explicitly opened, it expands over the content */
   .dashboard-shell.sidebar-open .dashboard-sidebar {
@@ -57,5 +52,12 @@
   /* Hide the Menu button in the Header because we have one in the TopPillBar */
   .app-header__menu-btn {
     display: none !important;
+  }
+}
+
+/* Pad the scrollable content area to make room for the sidebar in the first grid column (only for the static sidebar range 768px-1023px) */
+@media (max-width: 1023px) and (min-width: 768px) {
+  .dashboard-scroll {
+    padding-left: 80px !important;
   }
 }
