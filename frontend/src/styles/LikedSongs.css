@@ -1,37 +1,46 @@
+/* LikedSongs.css - Premium Purple Theme, Compact Layout, and Centered Alignments */
+
+/* Active State Sidebar Override */
+.dashboard-library-list__item--liked-songs.active {
+  background: rgba(122, 34, 255, 0.15) !important;
+  border-color: rgba(122, 34, 255, 0.3) !important;
+  color: #a855f7 !important;
+}
+
+.dashboard-library-list__item--liked-songs.active svg {
+  color: #a855f7 !important;
+  fill: rgba(168, 85, 247, 0.2) !important;
+}
+
+/* Page shell */
 .liked-page {
   position: relative;
   min-height: 100%;
   margin: 0;
-  padding: 26px 28px 30px;
-  overflow: hidden;
+  padding: 16px 20px 24px;
+  overflow-y: auto;
   background:
-    radial-gradient(circle at 57% -18%, rgba(30, 215, 96, 0.34), transparent 28%),
-    linear-gradient(180deg, rgba(29, 185, 84, 0.25) 0%, rgba(18, 18, 18, 1) 46%),
-    #0f0f0f;
+    radial-gradient(circle at 50% -20%, rgba(122, 34, 255, 0.15), transparent 50%),
+    #050506;
   color: #ffffff;
-}
-
-.liked-page::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 14% 8%, rgba(30, 215, 96, 0.22), transparent 26%),
-    radial-gradient(circle at 88% 18%, rgba(29, 185, 84, 0.12), transparent 24%),
-    linear-gradient(180deg, rgba(15, 15, 15, 0), #0f0f0f 72%);
 }
 
 .liked-page__noise {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.08;
+  opacity: 0.04;
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: 18px 18px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 78%);
+  background-size: 20px 20px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.6), transparent 85%);
+  z-index: 0;
+}
+
+/* Mobile topbar defaults (Hidden on desktop) */
+.liked-mobile-topbar {
+  display: none;
 }
 
 .liked-hero,
@@ -41,207 +50,186 @@
   z-index: 1;
 }
 
+/* Custom Header Banner - Compact & Shifted Background */
 .liked-hero {
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  align-items: end;
-  gap: 40px;
-  min-height: 250px;
-  padding: 0 0 30px;
-}
-
-.liked-hero__artwork {
   position: relative;
-  width: 320px;
-  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 200px;
+  padding: 24px 32px;
+  border-radius: 16px;
+  background-position: 80% 40%; /* Shift heart to the right and adjust vertical position */
+  background-size: cover; /* Stretch to cover the entire header box */
+  background-repeat: no-repeat;
+  background-color: #000000 !important; /* Set to pure black to match image background exactly */
   overflow: hidden;
-  border: 0;
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(29, 185, 84, 0.95), rgba(28, 28, 28, 0.92)),
-    #181818;
-  box-shadow:
-    0 28px 76px rgba(0, 0, 0, 0.72),
-    0 0 54px rgba(29, 185, 84, 0.22);
-  cursor: pointer;
+  box-shadow: 
+    0 12px 30px rgba(0, 0, 0, 0.5),
+    inset 0 0 60px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  margin-bottom: 20px;
 }
 
-.liked-hero__artwork img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: all 0.3s ease;
-}
-
-.liked-hero__artwork::after {
-  content: "";
+/* Glow & Dark fade overlay */
+.liked-hero::after {
+  content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(29, 185, 84, 0.2), rgba(0, 0, 0, 0.62));
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.liked-hero__artwork span {
-  position: absolute;
-  inset: 0;
+  background: linear-gradient(90deg, #050506 35%, rgba(5, 5, 6, 0.7) 60%, transparent 100%);
+  pointer-events: none;
   z-index: 1;
-  display: grid;
-  place-items: center;
-  color: #ffffff;
-  opacity: 0;
-  transform: scale(0.92);
-  transition: all 0.3s ease;
-}
-
-.liked-hero__artwork:hover img {
-  transform: scale(1.05);
-}
-
-.liked-hero__artwork:hover::after,
-.liked-hero__artwork:hover span {
-  opacity: 1;
-  transform: scale(1);
 }
 
 .liked-hero__content {
-  min-width: 0;
-  padding-bottom: 16px;
-}
-
-.liked-hero__label {
-  display: inline-flex;
-  margin-bottom: 12px;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  position: relative;
+  z-index: 2;
+  max-width: 600px;
 }
 
 .liked-hero h1 {
   margin: 0;
   color: #ffffff;
-  font-size: clamp(56px, 5.2vw, 82px);
+  font-size: clamp(32px, 3.8vw, 54px);
   font-weight: 800;
-  line-height: 0.95;
-  letter-spacing: 0;
-  text-shadow: 0 16px 45px rgba(0, 0, 0, 0.45);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-.liked-hero__content p {
-  max-width: 760px;
-  margin: 20px 0 0;
-  color: #b3b3b3;
-  font-size: 22px;
-  line-height: 1.55;
+.liked-hero__desc {
+  margin: 8px 0 16px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: clamp(14px, 1.6vw, 16px);
+  line-height: 1.4;
 }
 
-.liked-hero__meta {
+/* Mobile-only inline count metadata - hidden on desktop */
+.liked-hero__metadata {
+  display: none;
+}
+
+/* Actions Row in Hero */
+.liked-hero__actions {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  margin-top: 22px;
-  color: #b3b3b3;
-  font-size: 19px;
+  flex-wrap: wrap;
 }
 
-.liked-hero__avatar {
-  display: inline-grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background: linear-gradient(135deg, #1db954, #0f5130);
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 900;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
-}
-
-.liked-hero__meta strong {
-  color: #ffffff;
-}
-
-.liked-hero__meta span {
+/* Play All Button */
+.liked-play-all-btn {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #7A22FF, #a855f7);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(122, 34, 255, 0.35);
+  transition: all 0.25s ease;
 }
 
-.liked-hero__meta span::before {
-  content: "";
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.55);
+.liked-play-all-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(122, 34, 255, 0.5);
+  filter: brightness(1.08);
 }
 
-.liked-hero__meta .liked-hero__avatar::before {
-  content: none;
+.liked-play-all-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
+.liked-play-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Download & Filters Button Defaults (hidden on Desktop) */
+.liked-download-btn,
+.liked-filters-btn {
+  display: none;
+}
+
+/* Songs Count metadata text for desktop */
+.liked-hero__meta-count {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.liked-hero__meta-count::before {
+  content: '•';
+  margin-right: 10px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* Toolbar actions - search / refresh */
 .liked-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 30px;
-  padding: 0;
+  margin-bottom: 20px;
 }
 
 .liked-toolbar__actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.liked-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  min-height: 60px;
-  padding: 0 30px;
-  border: 0;
-  border-radius: 999px;
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.liked-button:disabled {
-  cursor: not-allowed;
-  filter: grayscale(1);
-  opacity: 0.55;
-}
-
-.liked-button--primary {
-  background: linear-gradient(135deg, #1db954, #1ed760);
-  box-shadow: 0 0 30px rgba(29, 185, 84, 0.4);
 }
 
 .liked-button--glass {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
   backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
 }
 
+.liked-button--glass:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Search Box */
 .liked-search {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: min(470px, 100%);
-  min-height: 60px;
-  padding: 0 22px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.72);
+  gap: 8px;
+  width: 240px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+}
+
+.liked-search:focus-within {
+  border-color: rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+  width: 280px;
 }
 
 .liked-search input {
@@ -251,135 +239,177 @@
   outline: 0;
   background: transparent;
   color: #ffffff;
-  font-size: 19px;
+  font-size: 13.5px;
 }
 
 .liked-search input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.35);
 }
 
+/* Song Table Shell */
 .liked-list-shell {
-  padding: 22px 22px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 26px;
-  background: rgba(255, 255, 255, 0.035);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  background: rgba(10, 10, 12, 0.4);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Grid columns layout */
+.liked-list-head,
+.liked-card {
+  display: grid;
+  grid-template-columns: 32px 48px minmax(220px, 2.5fr) minmax(140px, 1.2fr) minmax(140px, 1.2fr) 70px 96px;
+  align-items: center;
+  gap: 20px;
+  padding: 0 16px;
 }
 
 .liked-list-head {
-  display: grid;
-  grid-template-columns: 54px 70px minmax(0, 1.4fr) minmax(180px, 0.95fr) 86px 128px;
-  align-items: center;
-  gap: 14px;
-  padding: 0 18px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  color: #b3b3b3;
-  font-size: 15px;
-  font-weight: 800;
+  height: 36px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11.5px;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.liked-list-head span:nth-child(2) {
-  grid-column: 3;
+.liked-list-head__duration {
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 8px;
 }
 
 .liked-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
-  padding-top: 8px;
+  padding-top: 6px;
 }
 
+/* Song Card */
 .liked-card {
-  display: grid;
-  grid-template-columns: 54px 70px minmax(0, 1.4fr) minmax(180px, 0.95fr) 86px 128px;
-  align-items: center;
-  gap: 14px;
-  min-height: 86px;
-  padding: 10px 18px;
-  border: 1px solid transparent;
-  border-radius: 0;
-  border-bottom-color: rgba(255, 255, 255, 0.06);
+  height: 64px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
   background: transparent;
-  transition: all 0.25s ease;
 }
 
 .liked-card:hover {
-  border-color: rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .liked-card__index {
-  color: #b3b3b3;
-  font-size: 18px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13.5px;
   font-variant-numeric: tabular-nums;
   text-align: center;
+}
+
+/* Heart toggle button */
+.liked-card__heart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: #8B5CF6;
+  width: 32px;
+  height: 32px;
+  justify-self: center;
+  transition: transform 0.2s ease;
+}
+
+.liked-card__heart:hover {
+  transform: scale(1.1);
+}
+
+/* Title & Artwork Column combo */
+.liked-card__title-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .liked-card__art {
   position: relative;
   display: block;
-  width: 58px;
-  height: 58px;
+  width: 42px;
+  height: 42px;
   overflow: hidden;
   border: 0;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.05);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .liked-card__art img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: all 0.3s ease;
+  transition: transform 0.25s ease;
 }
 
-.liked-card__art span {
+.liked-card__play-overlay {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.56);
+  background: rgba(0, 0, 0, 0.5);
   color: #ffffff;
   opacity: 0;
-  transition: all 0.3s ease;
+  transition: opacity 0.2s ease;
+}
+
+.liked-card:hover .liked-card__play-overlay {
+  opacity: 1;
 }
 
 .liked-card:hover .liked-card__art img {
   transform: scale(1.05);
 }
 
-.liked-card:hover .liked-card__art span {
-  opacity: 1;
-}
-
-.liked-card__body {
+.liked-card__title-info {
   min-width: 0;
 }
 
-.liked-card h4 {
-  overflow: hidden;
+.liked-card__title-info h4 {
   margin: 0;
   color: #ffffff;
-  font-size: 20px;
-  font-weight: 850;
-  letter-spacing: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.liked-card__album,
-.liked-card__duration,
-.liked-empty {
-  margin: 0;
-  color: #b3b3b3;
-  font-size: 18px;
+/* Artist subtitle (only visible on mobile layout in that column, hidden on desktop list item) */
+.liked-card__subtitle-artists {
+  display: none;
+  margin: 2px 0 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* Standard columns */
+.liked-card__artist,
+.liked-card__album,
+.liked-card__duration {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13.5px;
+}
+
+.liked-card__artist,
 .liked-card__album {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -389,131 +419,333 @@
 .liked-card__duration {
   text-align: right;
   font-variant-numeric: tabular-nums;
+  padding-right: 8px;
 }
 
+/* Action button items */
 .liked-card__actions {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 14px;
+  gap: 8px;
 }
 
-.liked-card__actions button {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.82);
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-
-.liked-card__actions button:first-child {
-  width: 42px;
-  height: 42px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.liked-card__actions button:last-child {
-  border-color: transparent;
+.liked-card__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
   background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.liked-card__actions button:hover {
-  border-color: rgba(30, 215, 96, 0.38);
-  background: rgba(29, 185, 84, 0.18);
+.liked-card__action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
-  box-shadow: 0 0 18px rgba(29, 185, 84, 0.24);
 }
 
+/* Empty placeholder */
 .liked-empty {
-  margin-top: 16px;
-  padding: 28px 18px;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  line-height: 1.5;
+  margin-top: 8px;
+  padding: 30px;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14.5px;
 }
 
 .liked-empty.error {
-  color: #fecaca;
-  background: rgba(127, 29, 29, 0.24);
-  border-color: rgba(248, 113, 113, 0.34);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.03);
 }
 
-@media (max-width: 980px) {
+/* ────────────────────────────────────────────────────────────────────────── */
+/* MEDIA QUERIES FOR RESPONSIVENESS (MOBILE STYLING MATCHING SPEC) */
+
+@media (max-width: 1024px) {
+  .liked-list-head,
+  .liked-card {
+    grid-template-columns: 32px 36px minmax(200px, 2fr) minmax(120px, 1fr) 70px 80px;
+  }
+  .liked-list-head__album,
+  .liked-card__album {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
   .liked-page {
-    padding-inline: 14px;
+    padding: 0 12px 100px; /* Ultra-compact margins & padding to preserve space */
+    background: #050508;
   }
 
+  /* Sticky transparent navigation header bar */
+  .liked-mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px; /* Tighter height */
+    padding: 0 4px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(5, 5, 8, 0.65);
+    backdrop-filter: blur(20px);
+  }
+
+  .liked-mobile-topbar__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 0;
+    width: 36px;
+    height: 36px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 50%;
+  }
+  
+  .liked-mobile-topbar__btn:active {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  /* Compact Responsive Hero Banner */
   .liked-hero {
-    grid-template-columns: 180px minmax(0, 1fr);
-    min-height: 250px;
-    gap: 22px;
+    min-height: 140px; /* Extremely compact */
+    border-radius: 0;
+    border: 0;
+    padding: 8px 8px 16px;
+    align-items: flex-start;
+    text-align: left;
+    box-shadow: none;
+    background-position: center 30%; /* Shift heart upward and center horizontally */
+    background-size: cover; /* Stretch to cover the entire mobile header banner */
+    background-repeat: no-repeat;
+    background-color: #000000 !important; /* Match background on mobile */
+    margin-bottom: 14px;
   }
 
-  .liked-hero__artwork {
-    width: 180px;
+  /* Central/radial dark gradient fade to background color */
+  .liked-hero::after {
+    background: linear-gradient(180deg, rgba(5, 5, 8, 0.1) 0%, rgba(5, 5, 8, 0.75) 65%, #050508 100%);
+  }
+
+  .liked-hero__content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
   }
 
   .liked-hero h1 {
-    font-size: 46px;
+    font-size: 28px; /* Tighter header text */
+    letter-spacing: -0.01em;
+    font-weight: 800;
   }
 
+  .liked-hero__desc {
+    margin: 4px 0 6px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  /* Inline Metadata row under description */
+  .liked-hero__metadata {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 13.5px;
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+
+  .liked-hero__metadata svg {
+    color: #8B5CF6;
+    fill: #8B5CF6;
+  }
+
+  /* Buttons Row aligned in Mobile */
+  .liked-hero__actions {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .liked-play-all-btn {
+    flex: 1;
+    height: 42px; /* Tighter button */
+    border-radius: 10px;
+    font-size: 14.5px;
+    box-shadow: 0 4px 12px rgba(122, 34, 255, 0.4);
+    justify-content: center;
+    max-width: none;
+  }
+  
+  .liked-play-all-btn svg {
+    margin-right: 4px;
+  }
+
+  /* Download & Slider outline buttons */
+  .liked-download-btn,
+  .liked-filters-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px; /* Tighter buttons */
+    height: 42px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .liked-download-btn:active,
+  .liked-filters-btn:active {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  /* Hide desktop count label in mobile buttons row */
+  .liked-hero__meta-count {
+    display: none;
+  }
+
+  /* Search & Sync bar */
   .liked-toolbar {
-    align-items: stretch;
+    padding: 0;
     flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 14px;
   }
 
   .liked-search {
     width: 100%;
-  }
-}
-
-@media (max-width: 720px) {
-  .liked-hero {
-    grid-template-columns: 1fr;
-    align-items: start;
-    padding-top: 28px;
+    height: 34px;
+    padding: 0 12px;
   }
 
-  .liked-hero__artwork {
-    width: min(72vw, 230px);
+  .liked-search:focus-within {
+    width: 100%;
   }
 
-  .liked-hero h1 {
-    font-size: 40px;
+  .liked-button--glass {
+    width: 100%;
+    height: 34px;
+    justify-content: center;
+  }
+
+  /* Mobile Grid Card stacking */
+  .liked-list-shell {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    box-shadow: none;
+    backdrop-filter: none;
   }
 
   .liked-list-head {
     display: none;
   }
-
-  .liked-list-shell {
-    padding: 10px;
+  
+  .liked-list {
+    gap: 6px; /* Tighter distinct card gaps */
   }
 
   .liked-card {
-    grid-template-columns: 52px minmax(0, 1fr) auto;
-    min-height: 68px;
-    padding: 8px;
+    display: grid;
+    grid-template-columns: 1fr 36px 36px;
+    grid-template-rows: 1fr;
+    gap: 14px;
+    padding: 6px 12px;
+    height: 56px; /* Compact height to preserve space */
+    background: rgba(18, 18, 23, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 10px; /* Fine-tuned compact border radius */
+    align-items: center; /* Symmetrical vertical centering */
+  }
+  
+  .liked-card:hover {
+    background: rgba(18, 18, 23, 0.6);
+    border-color: rgba(255, 255, 255, 0.06);
   }
 
   .liked-card__index,
+  .liked-card__artist,
   .liked-card__album,
-  .liked-card__duration {
-    display: none;
+  .liked-card__duration,
+  .liked-card__queue-btn {
+    display: none; /* Hide non-essential desktop columns */
+  }
+
+  .liked-card__title-section {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
 
   .liked-card__art {
-    width: 52px;
-    height: 52px;
+    width: 42px;
+    height: 42px;
   }
 
-  .liked-toolbar__actions {
-    flex-wrap: wrap;
+  .liked-card__title-info h4 {
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+
+  .liked-card__subtitle-artists {
+    display: block; /* Show inline artists • album on mobile */
+    font-size: 11px;
+  }
+
+  .liked-card__heart {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+    color: #8B5CF6;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    margin: 0;
+  }
+
+  .liked-card__actions {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+    width: 32px;
+    height: 32px;
+  }
+
+  .liked-card__action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: rgba(255, 255, 255, 0.5);
   }
 }
