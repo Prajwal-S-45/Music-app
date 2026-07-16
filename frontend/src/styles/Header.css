@@ -2,7 +2,7 @@
 
 .app-header {
   grid-row: 1;
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -12,9 +12,9 @@
   grid-template-columns: max-content minmax(360px, 1fr) max-content;
   align-items: center;
   column-gap: 32px;
-  min-height: 62px;
+  min-height: 64px;
   width: auto;
-  padding: 7px 22px;
+  padding: 0 24px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.12);
   background:
     radial-gradient(circle at 18% 0%, rgba(34, 197, 94, 0.11), transparent 28%),
@@ -72,12 +72,27 @@
   gap: 8px;
 }
 
-.app-header__brand {
-  display: inline-flex;
+.app-header__brand-mobile {
+  display: none;
+  /* hidden on desktop by default */
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-  color: #f8fafc;
+  gap: 12px;
+  color: #fff;
+}
+
+.app-header__menu-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-strong);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.app-header__brand-desktop {
+  display: none;
+  /* hidden by default, shown on desktop */
 }
 
 .app-header__brand-mark {
@@ -216,16 +231,16 @@
 
 .app-header__search-shell {
   position: relative;
-  flex: 0 1 650px;
+  flex: 0 1 300px;
   width: 100%;
   min-width: 0;
-  max-width: 650px;
+  max-width: 300px;
   transition: max-width 0.38s cubic-bezier(0.22, 1, 0.36, 1), flex-basis 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .app-header__search-shell.expanded {
-  flex: 0 1 860px;
-  max-width: 860px;
+  flex: 0 1 340px;
+  max-width: 340px;
   z-index: 1100;
 }
 
@@ -632,7 +647,7 @@
   border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
-.app-header__account-identity > span {
+.app-header__account-identity>span {
   display: grid;
   place-items: center;
   width: 38px;
@@ -708,71 +723,293 @@
   }
 }
 
-@media (max-width: 1320px) {
+.app-header__brand-mobile {
+  display: none;
+  /* Hidden by default (Desktop/Laptop/Tablet) */
+}
+
+.app-header__menu-btn {
+  display: none;
+}
+
+.mobile-only-icon {
+  display: none;
+}
+
+/* =====================================================
+   RESPONSIVE MEDIA QUERIES (Desktop, Laptop, Tablet, Mobile)
+   ===================================================== */
+
+/* 0. DESKTOP ONLY (1101px and up) */
+@media (min-width: 1101px) {
+  .app-header {
+    grid-column: 1 / -1;
+    /* Span all columns to touch left edge */
+  }
+
+  .app-header__brand-desktop {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: #f8fafc;
+  }
+
+  .app-header__menu-btn {
+    display: none;
+    /* Hidden on desktop */
+  }
+}
+
+/* 1. LAPTOP (1024px - 1439px) */
+@media (max-width: 1439px) and (min-width: 1024px) {
   .app-header {
     grid-template-columns: max-content minmax(300px, 1fr) max-content;
     column-gap: 18px;
   }
 
   .app-header__search-shell {
-    max-width: 520px;
-  }
-
-  .app-header__language-copy {
-    display: none;
+    max-width: 260px;
   }
 }
 
-@media (max-width: 1180px) {
+/* 2. TABLET (768px - 1100px) */
+@media (max-width: 1100px) and (min-width: 768px) {
   .app-header {
-    grid-template-columns: max-content minmax(260px, 1fr) max-content;
-    column-gap: 14px;
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-inline: 16px;
+    flex-wrap: nowrap;
   }
 
-  .app-header__brand-copy {
+  .app-header__brand-mobile {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .app-header__menu-btn {
     display: none;
   }
+
+
 
   .app-header__tab {
     padding-inline: 9px;
   }
-}
 
-@media (max-width: 1100px) {
-  .app-header {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 12px;
+  .app-header__language-button {
+    min-width: auto;
+    padding: 0 8px;
   }
 
-  .app-header__center {
-    order: 3;
-    flex: 1 0 100%;
-    max-width: none;
+  .app-header__avatar-name {
+    display: none;
   }
 
   .app-header__search-shell {
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: none;
+    flex: 0 1 auto;
+    max-width: 300px;
   }
 }
 
-@media (max-width: 760px) {
+/* Tablet Portrait Override */
+@media (max-width: 1100px) and (min-width: 768px) and (orientation: portrait) {
+  .app-header__search-shell,
+  .app-header__search-shell.expanded {
+    flex: 0 1 240px !important;
+    max-width: 240px !important;
+  }
+}
+
+/* 3. MOBILE (320px - 767px) */
+@media (max-width: 767px) {
   .app-header {
-    min-height: 52px;
-    padding: 6px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 16px;
+    height: auto;
+  }
+
+  .app-header__brand-mobile {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: #f8fafc;
+    flex: 1;
+  }
+
+
+
+  .app-header__brand-mark {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #000;
+    font-weight: 800;
+    font-size: 18px;
+  }
+
+  .app-header__brand-copy {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-header__brand-copy strong {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .app-header__brand-copy span {
+    font-size: 11px;
+    color: var(--text-soft);
+  }
+
+  .app-header__center {
+    display: none;
+    /* Hide Search Bar in Header on Mobile */
+  }
+
+  .app-header__left {
+    display: flex;
+    /* Show Tabs */
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .app-header__left::-webkit-scrollbar {
+    display: none;
   }
 
   .app-header__tabs {
+    display: flex;
+    gap: 8px;
+  }
+
+  .app-header__tab {
+    padding: 6px 16px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-soft);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .app-header__tab.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .app-header__tab-indicator {
     display: none;
   }
 
-  .app-header__language-button strong {
+  .app-header__right {
+    min-width: 0;
+    gap: 12px;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+  }
+
+  .mobile-only-icon {
+    display: flex;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .app-header__language-button,
+  .app-header__language-copy {
     display: none;
   }
 
-  .app-header__language-button {
-    min-width: 38px;
+  .app-header__avatar-name,
+  .app-header__chevron {
+    display: none;
   }
+
+  .app-header__avatar-button {
+    padding: 0;
+    background: transparent;
+    border: none;
+  }
+
+  .app-header__avatar-pill {
+    padding: 0;
+    background: transparent;
+    border: none;
+  }
+
+  .app-header__upgrade-btn {
+    display: none !important;
+    /* Force hide upgrade button on mobile header */
+  }
+}
+
+
+/* ── Upgrade to Premium button ─────────────────────── */
+.app-header__upgrade-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #b45309, #d97706);
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
+  transition: box-shadow 0.2s, transform 0.15s;
+  letter-spacing: 0.01em;
+}
+
+.app-header__upgrade-btn:hover {
+  box-shadow: 0 6px 20px rgba(217, 119, 6, 0.5);
+}
+
+/* ── Generic icon button (bell, etc.) ──────────────── */
+.app-header__icon-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+
+.app-header__icon-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+
+/* ── Tighten language button for compact right side ── */
+.app-header__language-button {
+  gap: 5px;
+}
+
+.app-header__language-copy {
+  display: none;
 }
