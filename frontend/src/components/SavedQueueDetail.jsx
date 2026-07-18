@@ -68,8 +68,14 @@ const getArtistName = (song) => {
   return song.artist || song.subtitle || 'Unknown Artist';
 };
 
-function SavedQueueDetail({ onPlaySong, onPlayAll }) {
-  const user = JSON.parse(localStorage.getItem('user') || 'null');
+function SavedQueueDetail({ onPlaySong, onPlayAll, activeTrackId }) {
+  const user = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || 'null');
+    } catch {
+      return null;
+    }
+  })();
   const { queueId } = useParams();
   const navigate = useNavigate();
   const [queue, setQueue] = useState(null);
@@ -202,7 +208,7 @@ function SavedQueueDetail({ onPlaySong, onPlayAll }) {
   const coverImage = queue?.cover || FALLBACK_IMAGE;
   const description = queue?.description || PLAYLIST_DESCRIPTIONS[queue?.name] || 'My favorite tracks all in one place.';
   const emoji = PLAYLIST_EMOJIS[queue?.name] || '';
-  const userName = user?.name || 'Prajwal Angadi';
+  const userName = user?.name || 'Listener';
 
   if (!queue) {
     return (
@@ -233,7 +239,19 @@ function SavedQueueDetail({ onPlaySong, onPlayAll }) {
         </div>
 
         {/* Cover artwork */}
-        <div className="playlist-detail-hero__artwork" onClick={handleUpdateCover} title="Click to change cover">
+        <div
+          className="playlist-detail-hero__artwork"
+          onClick={handleUpdateCover}
+          title="Click to change cover"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleUpdateCover();
+            }
+          }}
+        >
           <img src={coverImage} alt={queue.name} />
           <button type="button" className="playlist-detail-hero__artwork-heart" onClick={(e) => e.stopPropagation()}>
             <Heart size={14} fill="#a78bfa" />
@@ -244,7 +262,19 @@ function SavedQueueDetail({ onPlaySong, onPlayAll }) {
         <div className="playlist-detail-hero__info">
           <span className="playlist-detail-hero__tag">PLAYLIST</span>
           <h1 className="playlist-detail-hero__title">{queue.name || 'Saved Queue'} {emoji}</h1>
-          <p className="playlist-detail-hero__desc" onClick={handleEditDescription} title="Click to edit">
+          <p
+            className="playlist-detail-hero__desc"
+            onClick={handleEditDescription}
+            title="Click to edit"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleEditDescription();
+              }
+            }}
+          >
             {description}
           </p>
           <div className="playlist-detail-hero__meta">
@@ -335,7 +365,7 @@ function SavedQueueDetail({ onPlaySong, onPlayAll }) {
           filteredSongs.map((song, index) => (
             <div
               key={`${queue.id}-${song.id}-${index}`}
-              className={`playlist-detail__track-row${song.id && song.id === window.__activeTrackId ? ' is-playing' : ''}`}
+              className={`playlist-detail__track-row${song.id && song.id === activeTrackId ? ' is-playing' : ''}`}
               onClick={() => onPlaySong?.(song, queue.songs)}
             >
               <span className="col-index">{index + 1}</span>
