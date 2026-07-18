@@ -426,7 +426,7 @@ function PlayerBar({
             <div className="player-fullscreen-info-wrapper">
               <div className="player-fullscreen-info">
                 <div className="player-fullscreen-title">
-                  <h2>{track.title}</h2>
+                  <h2>{cleanSongTitle(track.title)}</h2>
                   <p>{track.artist || track.channelTitle || 'Unknown Artist'}</p>
                 </div>
                 <div className="player-fullscreen-actions-right">
@@ -730,7 +730,10 @@ function PlayerBar({
               whileHover={{ scale: 1.2 }}
               whileTap={{ scale: 0.9 }}
               className={`player-bar__heart ${isLiked ? 'active' : ''}`}
-              onClick={handleLikeCurrentTrack}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLikeCurrentTrack();
+              }}
               disabled={!track || !token}
               aria-label={isLiked ? 'Track liked' : 'Like current track'}
             >
@@ -753,6 +756,7 @@ function PlayerBar({
             whileHover={{ scale: 1.15 }}
             className={`player-bar__btn-ghost ${isShuffle ? 'active' : ''}`}
             onClick={() => setIsShuffle(!isShuffle)}
+            aria-label={isShuffle ? 'Disable shuffle' : 'Enable shuffle'}
           >
             <Shuffle size={16} />
           </motion.button>
@@ -761,6 +765,7 @@ function PlayerBar({
             whileHover={{ scale: 1.15 }}
             className="player-bar__btn-ghost"
             onClick={handlePrevious}
+            aria-label="Previous song"
           >
             <SkipBack size={20} />
           </motion.button>
@@ -774,6 +779,7 @@ function PlayerBar({
             whileTap={{ scale: 0.95 }}
             className="player-bar__btn-play"
             onClick={handleTogglePlay}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="play-icon-offset" />}
           </motion.button>
@@ -782,6 +788,7 @@ function PlayerBar({
             whileHover={{ scale: 1.15 }}
             className="player-bar__btn-ghost"
             onClick={handleNext}
+            aria-label="Next song"
           >
             <SkipForward size={20} />
           </motion.button>
@@ -790,6 +797,7 @@ function PlayerBar({
             whileHover={{ scale: 1.15 }}
             className={`player-bar__btn-ghost ${isRepeat ? 'active' : ''}`}
             onClick={() => setIsRepeat(!isRepeat)}
+            aria-label={isRepeat ? 'Disable repeat' : 'Enable repeat'}
           >
             <Repeat size={16} />
           </motion.button>
@@ -806,6 +814,7 @@ function PlayerBar({
               value={Math.min(currentTime, Math.max(duration, 1))}
               onChange={handleSeek}
               style={progressStyle}
+              aria-label={`Playback progress: ${formatTime(currentTime)} of ${formatTime(duration)}`}
             />
           </div>
           <span className="time-label">{formatTime(duration)}</span>
@@ -824,6 +833,7 @@ function PlayerBar({
               step="0.01"
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
+              aria-label="Volume"
             />
           </div>
         </div>
@@ -832,6 +842,7 @@ function PlayerBar({
           whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.08)' }}
           className={`player-bar__btn-util ${isQueueOpen ? 'active' : ''}`}
           onClick={() => onToggleQueue?.()}
+          aria-label={isQueueOpen ? 'Hide queue' : 'Show queue'}
         >
           <ListMusic size={18} />
         </motion.button>
@@ -841,6 +852,7 @@ function PlayerBar({
           className="player-bar__btn-util"
           onClick={() => track && setIsFullScreen(true)}
           title="Expand to Full Screen"
+          aria-label="Expand to full screen"
         >
           <Expand size={18} />
         </motion.button>
