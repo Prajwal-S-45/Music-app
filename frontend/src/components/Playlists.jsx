@@ -542,6 +542,16 @@ function Playlists({ user: propUser, onUserUpdate, onPlayAll }) {
       {/* Section title bar with Sort + View toggles */}
       <div className="playlists-section-title">
         <h3>Your Playlists</h3>
+        {isMobile && (
+          <button
+            type="button"
+            className="playlists-see-all-btn"
+            onClick={() => setMobileActiveView('directory')}
+            aria-label="See directory"
+          >
+            See All
+          </button>
+        )}
         <div className="playlists-section-actions">
           <div className="playlist-toolbar">
             <span className="sort-label">Sort by:</span>
