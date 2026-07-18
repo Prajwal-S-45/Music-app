@@ -279,9 +279,17 @@
 }
 
 .playlist-card:hover .playlist-card__menu-btn,
+.playlist-card:focus-within .playlist-card__menu-btn,
 .playlist-card__menu-btn.active {
   opacity: 1;
   transform: scale(1);
+}
+
+@media (hover: none) {
+  .playlist-card__menu-btn {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .playlist-card__menu-btn:hover,
@@ -462,6 +470,7 @@
 }
 
 @media (max-width: 900px) {
+
   /* ── Mobile panel padding ── */
   .playlists-panel {
     padding: 0 0 100px 0;
@@ -512,13 +521,26 @@
   }
 
   /* "See All" link on mobile */
-  .playlists-section-title::after {
-    content: 'See All';
+  .playlists-see-all-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
     color: #7c3aed;
     font-size: 13px;
     font-weight: 600;
     margin-left: auto;
     cursor: pointer;
+    transition: opacity 0.2s ease;
+  }
+
+  .playlists-see-all-btn:hover {
+    opacity: 0.8;
+  }
+
+  .playlists-see-all-btn:focus-visible {
+    outline: 2px solid #7c3aed;
+    outline-offset: 4px;
+    border-radius: 4px;
   }
 
   /* Hide sort/view toggles on mobile */
