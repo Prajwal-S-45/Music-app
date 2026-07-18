@@ -9,7 +9,7 @@ const normalizeSong = (song) => ({
   image: song?.image || song?.cover || '',
   streamUrl: song?.streamUrl || '',
   duration: Number(song?.duration) || 0,
-  source: song?.source || 'youtube',
+  source: song?.source || 'jiosaavn',
   subtitle: song?.subtitle || song?.artist || '',
 });
 
