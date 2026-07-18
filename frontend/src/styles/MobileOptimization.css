@@ -586,7 +586,6 @@
 @media (max-width: 959px) {
 
   .dashboard-home__mobile-header,
-  .library-mobile-header,
   .player-fullscreen-mobile {
     display: flex !important;
   }
