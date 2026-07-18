@@ -8725,6 +8725,8 @@ body::-webkit-scrollbar,
   width: 100%;
   align-items: center;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* LEFT COLUMN */
