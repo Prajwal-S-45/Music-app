@@ -175,7 +175,13 @@ function HistoryPage({ token, activeTrackId, onPlayTrack, onSearchSubmit }) {
       const seen = new Set();
       return items.filter((item) => {
         if (item.type === 'search') return false;
-        const key = `${item.type}-${item.title}-${item.subtitle || ''}`;
+
+        const songId = getSongId(item.metadata?.id, item.metadata?.songId, item.target);
+        const source = item.metadata?.source || 'jiosaavn';
+        const key = songId
+          ? `${source}-${songId}`
+          : `${item.type}-${item.title}-${item.subtitle || ''}`;
+
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
@@ -375,141 +381,145 @@ function HistoryPage({ token, activeTrackId, onPlayTrack, onSearchSubmit }) {
           <p>Your searches and listening activity will appear here.</p>
           <button type="button" onClick={() => navigate('/')}>Browse Music</button>
         </div>
-      ) : processedItems.length === 0 ? (
-        <div className="history-empty history-empty--compact">
-          <h2>No activity found</h2>
-          <p>Try playing songs or searching for tracks first.</p>
-        </div>
       ) : (
-        <div className="history-feed">
-          {sectionNames.map((sectionName) => (
-            <section className="history-section" key={sectionName}>
-              <div className="history-section__title">{sectionName}</div>
+        <>
+          {processedItems.length === 0 ? (
+            <div className="history-empty history-empty--compact">
+              <h2>No activity found</h2>
+              <p>Try playing songs or searching for tracks first.</p>
+            </div>
+          ) : (
+            <div className="history-feed">
+              {sectionNames.map((sectionName) => (
+                <section className="history-section" key={sectionName}>
+                  <div className="history-section__title">{sectionName}</div>
 
-              <motion.div
-                className="history-section__items"
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  hidden: {},
-                  visible: { transition: { staggerChildren: 0.04 } },
-                }}
-              >
-                {groupedItems[sectionName].map((item) => {
-                  const meta = typeMeta[item.type] || typeMeta.song;
-                  const Icon = meta.icon;
-                  const isSongType = item.type === 'song';
-                  const isCurrent = isSongPlaying(item);
+                  <motion.div
+                    className="history-section__items"
+                    initial="hidden"
+                    animate="visible"
+                    variants={{
+                      hidden: {},
+                      visible: { transition: { staggerChildren: 0.04 } },
+                    }}
+                  >
+                    {groupedItems[sectionName].map((item) => {
+                      const meta = typeMeta[item.type] || typeMeta.song;
+                      const Icon = meta.icon;
+                      const isSongType = item.type === 'song';
+                      const isCurrent = isSongPlaying(item);
 
-                  return (
-                    <motion.article
-                      key={item.id}
-                      className={`history-card ${isCurrent ? 'history-card--active' : ''} ${isSongType ? 'history-card--song' : ''}`}
-                      tabIndex={0}
-                      role="button"
-                      onClick={() => handleOpen(item)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          handleOpen(item);
-                        }
-                      }}
-                      variants={{
-                        hidden: { opacity: 0, y: 12 },
-                        visible: { opacity: 1, y: 0, transition: { duration: 0.24 } },
-                      }}
-                      whileHover={{ y: -2 }}
-                    >
-                      <div className="history-card__media">
-                        {item.type === 'search' ? (
-                          <Icon size={22} />
-                        ) : (
-                          <>
-                            <img
-                              src={item.image || FALLBACK_IMAGE}
-                              alt={item.title}
-                              loading="lazy"
-                              onError={(event) => {
-                                event.currentTarget.onerror = null;
-                                event.currentTarget.src = FALLBACK_IMAGE;
-                              }}
-                            />
-                            {isSongType && !isCurrent && (
-                              <div className="history-card__play-overlay">
-                                <Play size={14} fill="currentColor" />
-                              </div>
+                      return (
+                        <motion.article
+                          key={item.id}
+                          className={`history-card ${isCurrent ? 'history-card--active' : ''} ${isSongType ? 'history-card--song' : ''}`}
+                          tabIndex={0}
+                          role="button"
+                          onClick={() => handleOpen(item)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              handleOpen(item);
+                            }
+                          }}
+                          variants={{
+                            hidden: { opacity: 0, y: 12 },
+                            visible: { opacity: 1, y: 0, transition: { duration: 0.24 } },
+                          }}
+                          whileHover={{ y: -2 }}
+                        >
+                          <div className="history-card__media">
+                            {item.type === 'search' ? (
+                              <Icon size={22} />
+                            ) : (
+                              <>
+                                <img
+                                  src={item.image || FALLBACK_IMAGE}
+                                  alt={item.title}
+                                  loading="lazy"
+                                  onError={(event) => {
+                                    event.currentTarget.onerror = null;
+                                    event.currentTarget.src = FALLBACK_IMAGE;
+                                  }}
+                                />
+                                {isSongType && !isCurrent && (
+                                  <div className="history-card__play-overlay">
+                                    <Play size={14} fill="currentColor" />
+                                  </div>
+                                )}
+                              </>
                             )}
-                          </>
-                        )}
-                      </div>
+                          </div>
 
-                      {/* Equalizer Indicator for currently playing tracks */}
-                      {isCurrent && (
-                        <div className="history-card__equalizer" title="Currently Playing">
-                          <span className="eq-bar eq-bar-1"></span>
-                          <span className="eq-bar eq-bar-2"></span>
-                          <span className="eq-bar eq-bar-3"></span>
-                        </div>
-                      )}
+                          {/* Equalizer Indicator for currently playing tracks */}
+                          {isCurrent && (
+                            <div className="history-card__equalizer" title="Currently Playing">
+                              <span className="eq-bar eq-bar-1"></span>
+                              <span className="eq-bar eq-bar-2"></span>
+                              <span className="eq-bar eq-bar-3"></span>
+                            </div>
+                          )}
 
-                      <div className="history-card__body">
-                        <h3 className={isCurrent ? 'text-active' : ''}>{item.title}</h3>
-                        <p>{item.subtitle || getActivityText(item)}</p>
-                      </div>
+                          <div className="history-card__body">
+                            <h3 className={isCurrent ? 'text-active' : ''}>{item.title}</h3>
+                            <p>{item.subtitle || getActivityText(item)}</p>
+                          </div>
 
-                      <div className="history-card__right-details">
-                        {isSongType && item.metadata?.duration ? (
-                          <span className="history-card__duration">
-                            {formatDuration(item.metadata.duration)}
-                          </span>
-                        ) : (
-                          <span className="history-card__time-ago">
-                            {getRelativeTime(item.timestamp)}
-                          </span>
-                        )}
+                          <div className="history-card__right-details">
+                            {isSongType && item.metadata?.duration ? (
+                              <span className="history-card__duration">
+                                {formatDuration(item.metadata.duration)}
+                              </span>
+                            ) : (
+                              <span className="history-card__time-ago">
+                                {getRelativeTime(item.timestamp)}
+                              </span>
+                            )}
 
-                        <div className="history-card__menu-wrap" onClick={(event) => event.stopPropagation()}>
-                          <button
-                            type="button"
-                            className="history-card__menu-btn"
-                            onClick={() => setOpenMenuId((value) => (value === item.id ? null : item.id))}
-                            aria-haspopup="menu"
-                            aria-expanded={openMenuId === item.id}
-                          >
-                            <MoreHorizontal size={18} />
-                          </button>
-
-                          <AnimatePresence>
-                            {openMenuId === item.id && (
-                              <motion.div
-                                className="history-menu"
-                                role="menu"
-                                initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                            <div className="history-card__menu-wrap" onClick={(event) => event.stopPropagation()}>
+                              <button
+                                type="button"
+                                className="history-card__menu-btn"
+                                onClick={() => setOpenMenuId((value) => (value === item.id ? null : item.id))}
+                                aria-haspopup="menu"
+                                aria-expanded={openMenuId === item.id}
                               >
-                                <button type="button" onClick={() => handleOpen(item)}>
-                                  <Play size={15} /> <span>{item.type === 'search' ? 'Search Again' : 'Play'}</span>
-                                </button>
-                                <button type="button" className="danger" onClick={() => handleRemove(item.id)}>
-                                  <Trash2 size={15} /> <span>Remove</span>
-                                </button>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      </div>
-                    </motion.article>
-                  );
-                })}
-              </motion.div>
-            </section>
-          ))}
+                                <MoreHorizontal size={18} />
+                              </button>
+
+                              <AnimatePresence>
+                                {openMenuId === item.id && (
+                                  <motion.div
+                                    className="history-menu"
+                                    role="menu"
+                                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                                  >
+                                    <button type="button" onClick={() => handleOpen(item)}>
+                                      <Play size={15} /> <span>{item.type === 'search' ? 'Search Again' : 'Play'}</span>
+                                    </button>
+                                    <button type="button" className="danger" onClick={() => handleRemove(item.id)}>
+                                      <Trash2 size={15} /> <span>Remove</span>
+                                    </button>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          </div>
+                        </motion.article>
+                      );
+                    })}
+                  </motion.div>
+                </section>
+              ))}
+            </div>
+          )}
 
           <div ref={loaderRef} className="history-loader">
             {loadingMore && renderSkeletons()}
           </div>
-        </div>
+        </>
       )}
 
       {/* Confirmation Modal */}
