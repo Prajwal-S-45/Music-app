@@ -24,10 +24,10 @@ function CategorySongRow({ song, index, activeTrackId, onPlayTrack, onLikeTrack,
 
   return (
     <motion.article
-      className={`premium-song-row category-song-row ${isActive ? 'is-active' : ''} ${isSubRow ? 'sub-version-row' : ''}`}
+      className={`premium-song-row category-song-row group ${isActive ? 'is-active' : ''} ${isSubRow ? 'sub-version-row' : ''}`}
       whileHover={{ y: -2 }}
     >
-      <div className="song-row-number">{!isSubRow ? index + 1 : 'â†³'}</div>
+      <div className="song-row-number">{!isSubRow ? index + 1 : '↳'}</div>
       <div className="premium-song-row__left cursor-pointer" onClick={() => onPlayTrack?.(song)}>
         <div className="premium-song-row__art">
           <img src={song.cover || song.thumbnail || FALLBACK_IMAGE} alt={song.title} loading="lazy" />
@@ -208,12 +208,24 @@ function CategoryArtistCard({ artist }) {
 }
 
 function CategoryPlaylistCard({ playlist }) {
+  const navigate = useNavigate();
   const title = playlist.title || playlist.name || 'Playlist';
 
+  const handleClick = () => {
+    if (playlist.isLocal) {
+      navigate(`/library/saved/${playlist.id}`);
+    } else {
+      navigate('/library');
+    }
+  };
+
   return (
-    <motion.article
+    <motion.button
+      type="button"
       whileHover={{ y: -4, scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       className="category-card category-card--playlist group"
+      onClick={handleClick}
     >
       <div className="category-card__image-wrapper">
         <img src={playlist.cover || playlist.image || FALLBACK_IMAGE} alt={title} loading="lazy" />
@@ -226,17 +238,25 @@ function CategoryPlaylistCard({ playlist }) {
         <span className="category-card__sub">by {playlist.creator || 'JioSaavn'}</span>
         <span className="category-card__meta">{playlist.songCount || 12} Songs</span>
       </div>
-    </motion.article>
+    </motion.button>
   );
 }
 
 function CategoryPodcastCard({ podcast }) {
+  const navigate = useNavigate();
   const title = podcast.title || podcast.name || 'Podcast';
 
+  const handleClick = () => {
+    navigate('/podcasts');
+  };
+
   return (
-    <motion.article
+    <motion.button
+      type="button"
       whileHover={{ y: -4, scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       className="category-card category-card--podcast group"
+      onClick={handleClick}
     >
       <div className="category-card__image-wrapper">
         <img src={podcast.cover || podcast.image || FALLBACK_IMAGE} alt={title} loading="lazy" />
@@ -249,17 +269,27 @@ function CategoryPodcastCard({ podcast }) {
         <span className="category-card__sub">{podcast.host || 'Podcast Host'}</span>
         <span className="category-card__meta">{podcast.season || 'Podcast'}</span>
       </div>
-    </motion.article>
+    </motion.button>
   );
 }
 
 function CategoryMovieCard({ movie }) {
+  const navigate = useNavigate();
   const title = movie.title || movie.name || 'Movie Soundtrack';
 
+  const handleClick = () => {
+    const artist = movie.artist || movie.composer || movie.music || 'Various Artists';
+    const titleVal = movie.title || movie.name || 'Untitled';
+    navigate(`/album/${encodeURIComponent(artist)}/${encodeURIComponent(titleVal)}${movie.id ? `?id=${encodeURIComponent(movie.id)}` : ''}`);
+  };
+
   return (
-    <motion.article
+    <motion.button
+      type="button"
       whileHover={{ y: -4, scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       className="category-card category-card--movie group"
+      onClick={handleClick}
     >
       <div className="category-card__image-wrapper">
         <img src={movie.poster || movie.cover || FALLBACK_IMAGE} alt={title} loading="lazy" />
@@ -269,10 +299,10 @@ function CategoryMovieCard({ movie }) {
       </div>
       <div className="category-card__info">
         <strong className="category-card__title">{title}</strong>
-        <span className="category-card__sub">{movie.language || 'Hindi'} â€¢ {movie.year || 'Soundtrack'}</span>
+        <span className="category-card__sub">{movie.language || 'Hindi'} • {movie.year || 'Soundtrack'}</span>
         <span className="category-card__meta">{movie.songCount || 5} Songs</span>
       </div>
-    </motion.article>
+    </motion.button>
   );
 }
 
@@ -291,13 +321,23 @@ function CategoryResultsGrid({
     // Group identical song titles + artist combinations
     const groupsMap = new Map();
     items.forEach((song) => {
-      const key = `${normalizeKey(song.title)}::${normalizeKey(song.artist)}`;
+      const canonicalTitle = (song.title || '')
+        .replace(/\s*[\(\[][^\]\)]*?\b(original|official|remastered|live)\b[^\]\)]*?[\)\]]/gi, '')
+        .replace(/\s*[-:]\s*[^-:\n]*?\b(original|official|remastered|live)\b[^-:\n]*/gi, '')
+        .replace(/\b(original|official|remastered|live)\b$/gi, '')
+        .trim();
+      const key = `${normalizeKey(canonicalTitle)}::${normalizeKey(song.artist)}`;
       if (!groupsMap.has(key)) {
         groupsMap.set(key, { primary: song, duplicates: [] });
       } else {
         const group = groupsMap.get(key);
         const titleLower = (song.title || '').toLowerCase();
-        if (titleLower.includes('original') || titleLower.includes('official')) {
+        if (
+          titleLower.includes('original') ||
+          titleLower.includes('official') ||
+          titleLower.includes('remastered') ||
+          titleLower.includes('live')
+        ) {
           group.duplicates.push(group.primary);
           group.primary = song;
         } else {
