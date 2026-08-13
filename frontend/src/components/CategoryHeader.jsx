@@ -37,7 +37,7 @@ function CategoryHeader({
           </button>
           <div className="category-title-row flex items-baseline gap-3">
             <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight m-0">{categoryName}</h1>
-            {total > 0 && (
+            {total >= 0 && (
               <span className="text-sm font-semibold text-slate-400">
                 {total} {total === 1 ? 'Result' : 'Results'}
               </span>
@@ -72,6 +72,7 @@ function CategoryHeader({
               className={`mode-btn ${mode === 'pagination' ? 'active' : ''}`}
               onClick={() => onModeChange?.('pagination')}
               title="Page Controls"
+              aria-pressed={mode === 'pagination'}
             >
               <ListFilter size={14} /> Pages
             </button>
@@ -80,6 +81,7 @@ function CategoryHeader({
               className={`mode-btn ${mode === 'infinite' ? 'active' : ''}`}
               onClick={() => onModeChange?.('infinite')}
               title="Infinite Scroll"
+              aria-pressed={mode === 'infinite'}
             >
               <Layers size={14} /> Infinite Scroll
             </button>
