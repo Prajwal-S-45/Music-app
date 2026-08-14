@@ -103,13 +103,6 @@ function DesktopSidebar() {
   return <aside className="desktop-view__sidebar">
     <nav className="desktop-view__primary-nav"><button type="button" className="active"><Home size={18} />Home</button><button type="button"><Search size={18} />Search</button><button type="button"><LibraryBig size={18} />Your Library</button></nav>
     <NavSection title="Browse" items={browseItems} /><NavSection title="Your Library" items={libraryItems} />
-    <div className="desktop-view__nav-section desktop-view__playlists">
-      <p>Playlists <span>+</span></p>
-      {['Chill Vibes', 'Workout Hits', 'Road Trip', 'Bollywood Mix'].map((name, index) => (
-        <button type="button" key={name}><img src={madeForYou[index].cover} alt="" />{name}</button>
-      ))}
-      <button type="button" className="desktop-view__show-more"><ChevronDown size={16} />Show More</button>
-    </div>
   </aside>;
 }
 
