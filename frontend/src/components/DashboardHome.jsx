@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Heart, Play } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import MusicCard from './MusicCard';
 import apiClient from '../api/client';
+import { getTrendingArtists } from '../api/musicApi';
 
 const DEFAULT_COVER =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1000&q=80';
@@ -21,32 +23,31 @@ const formatDuration = (seconds) => {
 };
 
 const formatTrack = (track) => {
-  if (!track || !(track.id || track.videoId)) {
+  if (!track || !track.id) {
     return null;
   }
 
-  const isJioSaavn = track.source === 'jiosaavn' || track.source === 'mock-fallback';
-  const trackId = track.id || track.videoId;
+  const trackId = track.id;
 
   return {
     ...track,
     id: trackId,
-    videoId: isJioSaavn ? null : trackId,
     title: track.title || 'Untitled Track',
-    artist: track.artist || track.channelTitle || 'Unknown Artist',
+    artist: track.artist || 'Unknown Artist',
     cover: track.cover || track.thumbnail || DEFAULT_COVER,
     duration: Number(track.duration) || 0,
     source: track.source || 'jiosaavn',
-    // Preserve streaming URL for JioSaavn tracks
-    streamUrl: isJioSaavn ? (track.file_url || track.streamUrl || '') : null,
+    streamUrl: track.file_url || track.streamUrl || '',
     file_url: track.file_url || '',
   };
 };
 
 import { PodcastsView, RadioView } from './NewCategories';
 
-function DashboardHome({ user, recentlyPlayed = [], onTrackSelect, onAddToQueue, onLikeTrack, onTracksLoaded }) {
+function DashboardHome({ user, language, recentlyPlayed = [], onTrackSelect, onAddToQueue, onLikeTrack, onTracksLoaded }) {
+  const navigate = useNavigate();
   const [tracks, setTracks] = useState([]);
+  const [topArtists, setTopArtists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activePill, setActivePill] = useState('All');
   const onTracksLoadedRef = useRef(onTracksLoaded);
@@ -60,8 +61,12 @@ function DashboardHome({ user, recentlyPlayed = [], onTrackSelect, onAddToQueue,
       try {
         setLoading(true);
 
+        const savedLangs = localStorage.getItem('music_pref_languages');
+        const languages = savedLangs ? JSON.parse(savedLangs) : [];
+        const primaryLanguage = languages[0] || 'Hindi';
+
         const response = await apiClient.get('/api/trending', {
-          params: { limit: 40 },
+          params: { limit: 40, language: primaryLanguage },
         });
         const trendingTracks = Array.isArray(response.data?.data)
           ? response.data.data
@@ -80,8 +85,33 @@ function DashboardHome({ user, recentlyPlayed = [], onTrackSelect, onAddToQueue,
       }
     };
 
+    const loadArtists = async () => {
+      try {
+        const res = await getTrendingArtists(20);
+        const raw = Array.isArray(res?.data?.data) ? res.data.data : (Array.isArray(res?.data) ? res.data : []);
+        const seen = new Set();
+        const unique = [];
+        for (const a of raw) {
+          if (!a || !a.name) continue;
+          const norm = a.name.toLowerCase().trim();
+          if (!seen.has(norm)) {
+            seen.add(norm);
+            unique.push({
+              id: a.id || a.name,
+              name: a.name,
+              image: a.image || a.thumbnail || DEFAULT_COVER,
+            });
+          }
+        }
+        setTopArtists(unique);
+      } catch (err) {
+        console.error('Failed to load top artists:', err);
+      }
+    };
+
     loadTrending();
-  }, []);
+    loadArtists();
+  }, [language]);
 
   const recentCards = useMemo(() => {
     return recentlyPlayed.length > 0 ? recentlyPlayed.slice(0, 18) : tracks.slice(0, 18);
@@ -197,6 +227,38 @@ function DashboardHome({ user, recentlyPlayed = [], onTrackSelect, onAddToQueue,
           ))}
         </div>
       </section>
+
+      {topArtists.length > 0 && (
+        <section className="dashboard-section">
+          <div className="dashboard-section__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3>Top Artists</h3>
+            </div>
+            <Link
+              to="/artists"
+              className="see-all-link"
+              style={{ color: '#94a3b8', fontSize: '14px', fontWeight: 600, textDecoration: 'none', transition: 'color 0.2s' }}
+            >
+              See All &rarr;
+            </Link>
+          </div>
+
+          <div className="dashboard-scroll-row artists-scroll-row">
+            {topArtists.map((artist) => (
+              <div
+                key={artist.id}
+                className="top-artist-card"
+                onClick={() => navigate(`/artists/${encodeURIComponent(artist.name)}`)}
+              >
+                <div className="top-artist-avatar-wrap">
+                  <img src={artist.image} alt={artist.name} className="top-artist-avatar" />
+                </div>
+                <span className="top-artist-name">{artist.name}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="dashboard-section">
         <div className="dashboard-section__header">
