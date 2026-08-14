@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Search, LibraryBig, Crown } from 'lucide-react';
+import { Home, Search, LibraryBig, Crown, UsersRound } from 'lucide-react';
 import '../styles/BottomNavigation.css';
 
 function BottomNavigation() {
@@ -12,6 +12,14 @@ function BottomNavigation() {
       >
         <Home size={24} />
         <span>Home</span>
+      </NavLink>
+
+      <NavLink 
+        to="/room" 
+        className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+      >
+        <UsersRound size={24} />
+        <span>Room</span>
       </NavLink>
 
       <NavLink 
