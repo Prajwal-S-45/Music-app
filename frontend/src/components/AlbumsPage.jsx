@@ -19,7 +19,9 @@ export default function AlbumsPage({ token, user, onPlayTrack, onQueueTrack }) {
   const getLocalLikedAlbums = () => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -120,6 +122,8 @@ export default function AlbumsPage({ token, user, onPlayTrack, onQueueTrack }) {
           await unlikeAlbum(albumId, token);
         } catch (err) {
           console.warn('Server unlike error:', err.message);
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(local));
+          alert(`Failed to unsave album: ${err.message || 'Server error'}`);
         }
       }
     } else {
@@ -133,13 +137,15 @@ export default function AlbumsPage({ token, user, onPlayTrack, onQueueTrack }) {
         year: album.year || '',
         type: album.type || 'Movie Album',
       };
-      updatedLocal = [payload, ...local.filter((a) => String(a.id || a.name).toLowerCase() !== albumId.toLowerCase())];
+      updatedLocal = [payload, ...local.filter((a) => String(a.album_id || a.id || a.name).toLowerCase() !== albumId.toLowerCase())];
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedLocal));
       if (token) {
         try {
           await likeAlbum(payload, token);
         } catch (err) {
           console.warn('Server like error:', err.message);
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(local));
+          alert(`Failed to save album: ${err.message || 'Server error'}`);
         }
       }
     }
@@ -189,8 +195,13 @@ export default function AlbumsPage({ token, user, onPlayTrack, onQueueTrack }) {
 
   // Open Album Detail Page
   const handleNavigateToAlbum = (album) => {
+    const albumName = album.name || album.title;
+    if (!albumName) {
+      console.warn('Invalid album: Name or title is missing.', album);
+      return;
+    }
     const artist = encodeURIComponent(album.artist || 'Various Artists');
-    const name = encodeURIComponent(album.name || album.title);
+    const name = encodeURIComponent(albumName);
     const idQuery = album.id && !String(album.id).startsWith('dyn-') ? `?id=${encodeURIComponent(album.id)}` : '';
     navigate(`/album/${artist}/${name}${idQuery}`);
   };
@@ -273,7 +284,12 @@ export default function AlbumsPage({ token, user, onPlayTrack, onQueueTrack }) {
           <Heart size={22} color="#ef4444" fill="#ef4444" /> Saved Albums
         </h2>
 
-        {sortedAlbums.length === 0 ? (
+        {loading ? (
+          <div className="albums-loading">
+            <div className="albums-loading-spinner" />
+            <p className="albums-loading-text">Loading your albums...</p>
+          </div>
+        ) : sortedAlbums.length === 0 ? (
           <div className="albums-empty-card">
             <div className="albums-empty-icon">
               <Album size={32} />
@@ -306,9 +322,19 @@ export default function AlbumsPage({ token, user, onPlayTrack, onQueueTrack }) {
                 <div
                   key={album.id || album.album_id || idx}
                   className="album-card"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleNavigateToAlbum(album)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.target !== e.currentTarget) return;
+                      e.preventDefault();
+                      handleNavigateToAlbum(album);
+                    }
+                  }}
                 >
                   <button
+                    type="button"
                     className={`album-card__like-btn ${liked ? 'liked' : ''}`}
                     onClick={(e) => handleToggleLike(e, album)}
                     title={liked ? 'Remove from Saved Albums' : 'Save to Albums'}
@@ -330,6 +356,7 @@ export default function AlbumsPage({ token, user, onPlayTrack, onQueueTrack }) {
                     />
                     <div className="album-card__overlay">
                       <button
+                        type="button"
                         className="album-card__play-btn"
                         onClick={(e) => handlePlayAlbum(e, album)}
                         title={`Play ${album.name}`}
@@ -368,9 +395,19 @@ export default function AlbumsPage({ token, user, onPlayTrack, onQueueTrack }) {
                 <div
                   key={album.id}
                   className="album-card"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleNavigateToAlbum(album)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.target !== e.currentTarget) return;
+                      e.preventDefault();
+                      handleNavigateToAlbum(album);
+                    }
+                  }}
                 >
                   <button
+                    type="button"
                     className={`album-card__like-btn ${liked ? 'liked' : ''}`}
                     onClick={(e) => handleToggleLike(e, album)}
                     title={liked ? 'Remove from Saved Albums' : 'Save to Albums'}
@@ -387,6 +424,7 @@ export default function AlbumsPage({ token, user, onPlayTrack, onQueueTrack }) {
                     />
                     <div className="album-card__overlay">
                       <button
+                        type="button"
                         className="album-card__play-btn"
                         onClick={(e) => handlePlayAlbum(e, album)}
                         title={`Play ${album.name}`}
