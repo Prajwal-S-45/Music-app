@@ -36,7 +36,7 @@ class ErrorBoundary extends React.Component {
           <h2>Something went wrong.</h2>
           <button 
             onClick={this.resetErrorBoundary}
-            style={{ padding: '8px 16px', marginTop: '16px', background: '#22c55e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+            style={{ padding: '8px 16px', marginTop: '16px', background: '#e2e8f0', color: '#0f172a', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
           >
             Try Again
           </button>
