@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Play, Shuffle, Heart, MoreHorizontal,
   Clock, Share2, Disc, ListMusic, Plus,
 } from 'lucide-react';
-import { getArtistAlbums, searchSongs } from '../api/musicApi';
+import { getAlbumDetails, getArtistAlbums, searchSongs, getLikedAlbums, likeAlbum, unlikeAlbum } from '../api/musicApi';
 import '../styles/AlbumDetailsStyles.css';
 
-/* ─── Helpers ─── */
+/* â”€â”€â”€ Helpers â”€â”€â”€ */
 const fmt = (s) => {
   if (!s) return '0:00';
   const m = Math.floor(s / 60);
@@ -16,7 +16,7 @@ const fmt = (s) => {
 };
 
 const extractMovieName = (albumName) => {
-  const regex = /(?:\(|\[)\s*from\s+["'“‘]([^"'”’]+)["'”’]\s*(?:\)|\])/i;
+  const regex = /(?:\(|\[)\s*from\s+["'â€œâ€˜]([^"'â€â€™]+)["'â€â€™]\s*(?:\)|\])/i;
   const match = albumName.match(regex);
   if (match && match[1]) return match[1].trim();
 
@@ -36,7 +36,7 @@ const sumDuration = (tracks) => {
   return `${m} min`;
 };
 
-/* ─── Skeleton ─── */
+/* â”€â”€â”€ Skeleton â”€â”€â”€ */
 const SkeletonLoader = () => (
   <div className="adp-page">
     <div className="adp-skel-hero">
@@ -62,9 +62,9 @@ const SkeletonLoader = () => (
   </div>
 );
 
-/* ─── Track Row (memoised) ─── */
+/* â”€â”€â”€ Track Row (memoised) â”€â”€â”€ */
 const TrackRow = memo(({ song, idx, isPlaying, onPlay, onQueue, onLike, likedIds }) => {
-  const [liked, setLiked] = useState(likedIds.has(song.id || song.videoId));
+  const [liked, setLiked] = useState(likedIds.has(song.id));
 
   const handleLike = (e) => {
     e.stopPropagation();
@@ -110,7 +110,7 @@ const TrackRow = memo(({ song, idx, isPlaying, onPlay, onQueue, onLike, likedIds
   );
 });
 
-/* ─── Related Album Card ─── */
+/* â”€â”€â”€ Related Album Card â”€â”€â”€ */
 const RelatedCard = memo(({ album, onClick, onPlay }) => (
   <div className="adp-related-card" onClick={onClick}>
     <div className="adp-related-img-wrap">
@@ -126,17 +126,19 @@ const RelatedCard = memo(({ album, onClick, onPlay }) => (
       </div>
     </div>
     <div className="adp-related-title">{album.name}</div>
-    <div className="adp-related-meta">{album.year || '—'} · {album.type || 'Album'}</div>
+    <div className="adp-related-meta">{album.year || 'â€”'} Â· {album.type || 'Album'}</div>
   </div>
 ));
 
-/* ─── Main Component ─── */
-export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpdate }) {
+/* â”€â”€â”€ Main Component â”€â”€â”€ */
+export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpdate, token }) {
   const { artistName: rawArtist, albumName: rawAlbum } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const decodedArtist = decodeURIComponent(rawArtist || '');
   const decodedAlbum  = decodeURIComponent(rawAlbum  || '');
+  const albumId = searchParams.get('id');
 
   const [albumData,    setAlbumData]    = useState(null);
   const [allArtistAlbums, setAllArtistAlbums] = useState([]);
@@ -148,7 +150,58 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
 
   const likedIds = useRef(new Set());
 
-  /* ── Fetch ── */
+  // Check initial liked status for this album
+  useEffect(() => {
+    const targetKey = String(albumId || decodedAlbum).toLowerCase();
+    try {
+      const saved = localStorage.getItem('music_app_liked_albums');
+      const list = saved ? JSON.parse(saved) : [];
+      const found = list.some(a => String(a.id || a.album_id || a.name).toLowerCase() === targetKey);
+      setIsLiked(found);
+    } catch {
+      setIsLiked(false);
+    }
+  }, [albumId, decodedAlbum]);
+
+  const handleToggleAlbumLike = async () => {
+    const key = String(albumId || decodedAlbum).trim();
+    const nextState = !isLiked;
+    setIsLiked(nextState);
+
+    let saved = [];
+    try {
+      const raw = localStorage.getItem('music_app_liked_albums');
+      saved = raw ? JSON.parse(raw) : [];
+    } catch { saved = []; }
+
+    const coverUrl = albumData?.cover || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80';
+
+    if (nextState) {
+      const payload = {
+        albumId: key,
+        id: key,
+        name: albumData?.name || decodedAlbum,
+        artist: albumData?.artist || decodedArtist,
+        cover: coverUrl,
+        year: albumData?.year || '',
+        type: albumData?.type || 'Movie Album',
+      };
+      const updated = [payload, ...saved.filter(a => String(a.id || a.album_id || a.name).toLowerCase() !== key.toLowerCase())];
+      localStorage.setItem('music_app_liked_albums', JSON.stringify(updated));
+      if (token) {
+        try { await likeAlbum(payload, token); } catch {}
+      }
+    } else {
+      const updated = saved.filter(a => String(a.id || a.album_id || a.name).toLowerCase() !== key.toLowerCase());
+      localStorage.setItem('music_app_liked_albums', JSON.stringify(updated));
+      if (token) {
+        try { await unlikeAlbum(key, token); } catch {}
+      }
+    }
+    window.dispatchEvent(new CustomEvent('likedAlbumsUpdated'));
+  };
+
+  /* â”€â”€ Fetch â”€â”€ */
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -158,8 +211,33 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
 
     const run = async () => {
       try {
+        if (albumId) {
+          const [albumResponse, artistAlbumsResponse] = await Promise.all([
+            getAlbumDetails(albumId),
+            getArtistAlbums(decodedArtist, { nocache: 'true' }).catch(() => null),
+          ]);
+          const exactAlbum = albumResponse.data?.data ?? albumResponse.data;
+          const relatedAlbums = artistAlbumsResponse?.data?.data ?? artistAlbumsResponse?.data ?? [];
+
+          if (!exactAlbum || !Array.isArray(exactAlbum.songs)) {
+            throw new Error('Album tracks are unavailable.');
+          }
+
+          setAlbumData({ ...exactAlbum, artist: exactAlbum.artist || decodedArtist });
+          setAllArtistAlbums(Array.isArray(relatedAlbums) ? relatedAlbums : []);
+          setTracks(exactAlbum.songs.map((song, index) => ({
+            ...song,
+            id: song.id || `${albumId}-${index}`,
+            title: song.title || song.name || 'Untitled',
+            cover: song.cover || song.thumbnail || exactAlbum.cover || '',
+            artist: song.artist || exactAlbum.artist || decodedArtist,
+            source: 'jiosaavn',
+            playable: Boolean(song.id),
+          })).filter((song) => song.playable));
+          return;
+        }
         const movieName = extractMovieName(decodedAlbum);
-        // Clean query — jiosaavnService already appends "official audio video"
+        // Clean query â€” jiosaavnService already appends "official audio video"
         const albumSearch = movieName || decodedAlbum;
         const searchQueryStr = `${albumSearch} movie songs`;
 
@@ -220,12 +298,11 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
           const normalised = arr
             .map((s, i) => ({
               ...s,
-              id: s.videoId || s.id || String(i),
-              videoId: s.videoId || s.id,
+              id: s.id || String(i),
               cover: s.thumbnail || s.cover || '',
-              artist: s.channelTitle || s.artist || decodedArtist,
+              artist: s.artist || decodedArtist,
               source: 'jiosaavn',
-              playable: Boolean(s.videoId || s.id),
+              playable: Boolean(s.id),
             }))
             .filter(s => {
               const title = (s.title || s.name || '').toLowerCase();
@@ -242,7 +319,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
               .toLowerCase()
               .replace(/\(.*?\)/g, '')       // remove parenthetical
               .replace(/\|.*$/g, '')          // remove after pipe
-              .replace(/[-–—].*?(official|full|video|audio|song|lyric|hd|4k).*/gi, '')
+              .replace(/[-â€“â€”].*?(official|full|video|audio|song|lyric|hd|4k).*/gi, '')
               .replace(/[^a-z0-9\s]/g, '')
               .trim()
               .split(/\s+/).slice(0, 3).join(' ');  // first 3 words for matching
@@ -262,9 +339,9 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
 
     run();
     return () => { alive = false; };
-  }, [rawArtist, rawAlbum]);
+  }, [rawArtist, rawAlbum, albumId, decodedArtist]);
 
-  /* ── Playback handlers ── */
+  /* â”€â”€ Playback handlers â”€â”€ */
   const playSong = useCallback((song, idx, list) => {
     if (!song.playable || !onPlayTrack) return;
     setActiveId(song.id);
@@ -299,12 +376,11 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
       const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
       const songs = arr.map(s => ({
         ...s,
-        id: s.videoId || s.id,
-        videoId: s.videoId || s.id,
+        id: s.id,
         cover: s.thumbnail || s.cover || '',
-        artist: s.channelTitle || s.artist || decodedArtist,
+        artist: s.artist || decodedArtist,
         source: 'jiosaavn',
-        playable: Boolean(s.videoId || s.id),
+        playable: Boolean(s.id),
       })).filter(s => s.playable);
       if (songs.length && onPlayTrack) {
         onPlayTrack(songs[0]);
@@ -313,7 +389,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
     } catch { /* silent */ }
   }, [decodedArtist, onPlayTrack, onQueueTrack]);
 
-  /* ── Derived ── */
+  /* â”€â”€ Derived â”€â”€ */
   const relatedAlbums = allArtistAlbums.filter(
     a => a.name.toLowerCase() !== decodedAlbum.toLowerCase() && a.cover
   ).slice(0, 12);
@@ -321,7 +397,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
   const coverUrl = albumData?.cover
     || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80';
 
-  /* ── Render ── */
+  /* â”€â”€ Render â”€â”€ */
   if (loading) return <SkeletonLoader />;
 
   if (error) {
@@ -333,7 +409,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
           <p>{error}</p>
           <button
             onClick={() => navigate(-1)}
-            style={{ marginTop: 12, padding: '10px 24px', background: '#1ed760', color: '#000', border: 'none', borderRadius: 24, fontWeight: 700, cursor: 'pointer' }}
+            style={{ marginTop: 12, padding: '10px 24px', background: '#e2e8f0', color: '#0f172a', border: 'none', borderRadius: 24, fontWeight: 700, cursor: 'pointer' }}
           >
             Go Back
           </button>
@@ -344,7 +420,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
 
   return (
     <div className="adp-page">
-      {/* ── Hero ── */}
+      {/* â”€â”€ Hero â”€â”€ */}
       <div
         className="adp-hero"
         style={{ backgroundImage: `url(${coverUrl})` }}
@@ -359,7 +435,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
 
             <div
               className="adp-artist-row"
-              onClick={() => navigate(`/artist/${encodeURIComponent(rawArtist)}`)}
+              onClick={() => navigate(`/artists/${encodeURIComponent(rawArtist)}`)}
             >
               <img
                 className="adp-artist-avatar"
@@ -371,10 +447,10 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
 
             <div className="adp-meta-chips">
               {albumData?.year && <span className="adp-meta-chip">{albumData.year}</span>}
-              {albumData?.year && <span className="adp-meta-dot">•</span>}
+              {albumData?.year && <span className="adp-meta-dot">â€¢</span>}
               <span className="adp-meta-chip">{tracks.length} songs</span>
-              {tracks.length > 0 && <><span className="adp-meta-dot">•</span><span className="adp-meta-chip">{sumDuration(tracks)}</span></>}
-              {albumData?.genre && <><span className="adp-meta-dot">•</span><span className="adp-meta-chip">{albumData.genre}</span></>}
+              {tracks.length > 0 && <><span className="adp-meta-dot">â€¢</span><span className="adp-meta-chip">{sumDuration(tracks)}</span></>}
+              {albumData?.genre && <><span className="adp-meta-dot">â€¢</span><span className="adp-meta-chip">{albumData.genre}</span></>}
             </div>
             {albumData?.label && (
               <div className="adp-label-text">{albumData.label}</div>
@@ -383,7 +459,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
         </div>
       </div>
 
-      {/* ── Action Bar ── */}
+      {/* â”€â”€ Action Bar â”€â”€ */}
       <div className="adp-action-bar">
         <button className="adp-btn-play" onClick={playAll} title="Play All">
           <Play fill="currentColor" size={28} />
@@ -393,7 +469,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
         </button>
         <button
           className={`adp-icon-btn${isLiked ? ' liked' : ''}`}
-          onClick={() => setIsLiked(p => !p)}
+          onClick={handleToggleAlbumLike}
           title={isLiked ? 'Unlike' : 'Like'}
         >
           <Heart size={28} fill={isLiked ? 'currentColor' : 'none'} />
@@ -406,7 +482,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
         </button>
       </div>
 
-      {/* ── Tracklist ── */}
+      {/* â”€â”€ Tracklist â”€â”€ */}
       <div className="adp-tracks-section">
         {tracks.length === 0 ? (
           <div className="adp-empty">
@@ -442,7 +518,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
         )}
       </div>
 
-      {/* ── Related Albums ── */}
+      {/* â”€â”€ Related Albums â”€â”€ */}
       {relatedAlbums.length > 0 && (
         <div className="adp-related-section">
           <h2 className="adp-section-title">More by {decodedArtist}</h2>
@@ -451,7 +527,7 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
               <RelatedCard
                 key={album.id}
                 album={album}
-                onClick={() => navigate(`/album/${encodeURIComponent(rawArtist)}/${encodeURIComponent(album.name)}`)}
+                onClick={() => navigate(`/album/${encodeURIComponent(rawArtist)}/${encodeURIComponent(album.name)}${album.id ? `?id=${encodeURIComponent(album.id)}` : ''}`)}
                 onPlay={playRelated}
               />
             ))}
@@ -461,3 +537,4 @@ export default function AlbumDetailsPage({ onPlayTrack, onQueueTrack, onLikeUpda
     </div>
   );
 }
+
