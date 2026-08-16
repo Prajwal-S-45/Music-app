@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { UserCheck, Sparkles, Compass, Play, Search, Heart, Music2, Users } from 'lucide-react';
 import apiClient from '../api/client';
 import '../styles/MyArtistsStyles.css';
@@ -10,27 +10,44 @@ function ArtistAvatar({ name, initialImage, className }) {
       ? initialImage
       : ''
   );
+  const generationRef = useRef(0);
 
   useEffect(() => {
+    generationRef.current += 1;
+    const currentGen = generationRef.current;
+
     if (initialImage && typeof initialImage === 'string' && initialImage.startsWith('http') && !initialImage.includes('unsplash.com')) {
       setSrc(initialImage);
       return;
     }
+
+    setSrc('');
     if (!name) return;
-    let isMounted = true;
+
     apiClient.get(`/api/music/artist-image?name=${encodeURIComponent(name)}`)
       .then(res => {
-        if (isMounted && res.data?.url) setSrc(res.data.url);
+        if (generationRef.current === currentGen && res.data?.url) {
+          setSrc(res.data.url);
+        }
       })
       .catch(() => {});
-    return () => { isMounted = false; };
+
+    return () => {
+      generationRef.current += 1;
+    };
   }, [name, initialImage]);
 
   const handleError = () => {
+    generationRef.current += 1;
+    const currentGen = generationRef.current;
+    setSrc('');
+
     if (name) {
       apiClient.get(`/api/music/artist-image?name=${encodeURIComponent(name)}`)
         .then(res => {
-          if (res.data?.url) setSrc(res.data.url);
+          if (generationRef.current === currentGen && res.data?.url) {
+            setSrc(res.data.url);
+          }
         })
         .catch(() => {});
     }
@@ -53,12 +70,17 @@ export default function MyArtistsPage({ user }) {
   const [recommendedArtists, setRecommendedArtists] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoadingRecs, setIsLoadingRecs] = useState(true);
+  const [recsError, setRecsError] = useState(null);
 
   // Sync followed artists from localStorage
   const loadFollowedArtists = () => {
     try {
       const saved = localStorage.getItem('music_app_followed_artists');
-      setFollowedArtists(saved ? JSON.parse(saved) : []);
+      const parsed = saved ? JSON.parse(saved) : [];
+      const isValid =
+        Array.isArray(parsed) &&
+        parsed.every(item => item && typeof item === 'object' && typeof item.name === 'string');
+      setFollowedArtists(isValid ? parsed : []);
     } catch {
       setFollowedArtists([]);
     }
@@ -75,14 +97,21 @@ export default function MyArtistsPage({ user }) {
   useEffect(() => {
     let mounted = true;
     const fetchRecs = async () => {
-      try {
+      if (mounted) {
         setIsLoadingRecs(true);
+        setRecsError(null);
+        setRecommendedArtists([]);
+      }
+      try {
         const endpoint = user ? '/api/recommendations/artists' : '/api/music/trending-artists';
         const res = await apiClient.get(endpoint, { params: { limit: 8 } });
         if (mounted && res.data?.data) {
           setRecommendedArtists(res.data.data);
         }
       } catch (err) {
+        if (mounted) {
+          setRecsError('Failed to load recommended artists.');
+        }
         console.warn('Failed to load recommended artists:', err);
       } finally {
         if (mounted) setIsLoadingRecs(false);
@@ -132,6 +161,18 @@ export default function MyArtistsPage({ user }) {
           <h2 className="my-artists-section__title">
             <UserCheck size={20} color="#10b981" /> Artists You Follow
           </h2>
+          {followedArtists.length > 0 && (
+            <div className="my-artists-search-box">
+              <Search size={16} className="my-artists-search-icon" />
+              <input
+                type="text"
+                placeholder="Search followed artists..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="my-artists-search-input"
+              />
+            </div>
+          )}
         </div>
 
         {followedArtists.length === 0 ? (
@@ -147,13 +188,20 @@ export default function MyArtistsPage({ user }) {
               <Compass size={16} style={{ display: 'inline', marginRight: '6px' }} /> Explore Global Top Artists
             </button>
           </div>
+        ) : filteredFollowed.length === 0 ? (
+          <div className="my-artists-empty-card">
+            <h3 className="my-artists-empty-title">No Matching Artists Found</h3>
+            <p className="my-artists-empty-text">
+              No artists in your library match "{searchQuery}".
+            </p>
+          </div>
         ) : (
           <div className="my-artists-grid">
             {filteredFollowed.map((artist, idx) => (
-              <div
+              <Link
                 key={artist.id || idx}
+                to={`/artists/${encodeURIComponent(artist.name)}`}
                 className="my-artist-card"
-                onClick={() => navigate(`/artists/${encodeURIComponent(artist.name)}`)}
               >
                 <ArtistAvatar
                   name={artist.name}
@@ -168,7 +216,7 @@ export default function MyArtistsPage({ user }) {
                 >
                   Following ✓
                 </button>
-              </div>
+              </Link>
             ))}
           </div>
         )}
@@ -182,32 +230,47 @@ export default function MyArtistsPage({ user }) {
           </h2>
         </div>
 
-        <div className="my-artists-grid">
-          {recommendedArtists.map((artist, idx) => (
-            <div
-              key={artist.id || idx}
-              className="my-artist-card"
-              onClick={() => navigate(`/artists/${encodeURIComponent(artist.name)}`)}
-            >
-              <ArtistAvatar
-                name={artist.name}
-                initialImage={artist.image || artist.thumbnail}
-                className="my-artist-avatar"
-              />
-              <div className="my-artist-name">{artist.name}</div>
-              <div className="my-artist-role">{artist.language || 'Trending'}</div>
-              <button
-                className="podium-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/artists/${encodeURIComponent(artist.name)}`);
-                }}
+        {isLoadingRecs ? (
+          <div className="my-artists-empty-card">
+            <p className="my-artists-empty-text">Loading recommendations...</p>
+          </div>
+        ) : recsError ? (
+          <div className="my-artists-empty-card">
+            <h3 className="my-artists-empty-title">Unable to Load Recommendations</h3>
+            <p className="my-artists-empty-text">{recsError}</p>
+          </div>
+        ) : recommendedArtists.length > 0 ? (
+          <div className="my-artists-grid">
+            {recommendedArtists.map((artist, idx) => (
+              <Link
+                key={artist.id || idx}
+                to={`/artists/${encodeURIComponent(artist.name)}`}
+                className="my-artist-card"
               >
-                <Play size={12} /> Explore
-              </button>
-            </div>
-          ))}
-        </div>
+                <ArtistAvatar
+                  name={artist.name}
+                  initialImage={artist.image || artist.thumbnail}
+                  className="my-artist-avatar"
+                />
+                <div className="my-artist-name">{artist.name}</div>
+                <div className="my-artist-role">{artist.language || 'Trending'}</div>
+                <button
+                  className="podium-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/artists/${encodeURIComponent(artist.name)}`);
+                  }}
+                >
+                  <Play size={12} /> Explore
+                </button>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="my-artists-empty-card">
+            <p className="my-artists-empty-text">No recommended artists available right now.</p>
+          </div>
+        )}
       </section>
     </div>
   );
