@@ -16,6 +16,12 @@ import {
   Star,
   UserCircle2,
   Menu,
+  Crown,
+  Sliders,
+  X,
+  Check,
+  Smile,
+  RefreshCw,
 } from 'lucide-react';
 import SearchDropdown from './SearchDropdown';
 
@@ -54,6 +60,102 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
     return 'Music';
   }, [location.pathname]);
 
+  const isPremium = useMemo(() => {
+    return user?.isPremium || (user?.plan && user.plan !== 'Free Plan');
+  }, [user]);
+
+  const preferenceOptions = useMemo(() => ({
+    languages: ['Kannada', 'Hindi', 'Telugu', 'Tamil', 'Malayalam', 'English', 'Marathi', 'Bengali'],
+    genres: ['Melody', 'Pop', 'Romantic', 'Rock', 'Hip-Hop', 'Classical', 'Devotional', 'Folk'],
+    moods: ['Chill', 'Happy', 'Romantic', 'Energetic', 'Sad', 'Focus', 'Party', 'Workout']
+  }), []);
+
+  const [selectedLangs, setSelectedLangs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('music_pref_languages');
+      return saved ? JSON.parse(saved) : ['Kannada', 'English', 'Hindi'];
+    } catch {
+      return ['Kannada', 'English', 'Hindi'];
+    }
+  });
+
+  const [selectedGenres, setSelectedGenres] = useState(() => {
+    try {
+      const saved = localStorage.getItem('music_pref_genres');
+      return saved ? JSON.parse(saved) : ['Melody', 'Pop', 'Romantic'];
+    } catch {
+      return ['Melody', 'Pop', 'Romantic'];
+    }
+  });
+
+  const [selectedMoods, setSelectedMoods] = useState(() => {
+    try {
+      const saved = localStorage.getItem('music_pref_moods');
+      return saved ? JSON.parse(saved) : ['Chill', 'Romantic'];
+    } catch {
+      return ['Chill', 'Romantic'];
+    }
+  });
+
+  const handleToggleLang = (lang) => {
+    setSelectedLangs(prev => prev.includes(lang) ? prev.filter(l => l !== lang) : [...prev, lang]);
+  };
+
+  const handleToggleGenre = (genre) => {
+    setSelectedGenres(prev => prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]);
+  };
+
+  const handleToggleMood = (mood) => {
+    setSelectedMoods(prev => prev.includes(mood) ? prev.filter(m => m !== mood) : [...prev, mood]);
+  };
+
+  const handleSelectAllLangs = () => {
+    if (selectedLangs.length === preferenceOptions.languages.length) {
+      setSelectedLangs([]);
+    } else {
+      setSelectedLangs([...preferenceOptions.languages]);
+    }
+  };
+
+  const handleSelectAllGenres = () => {
+    if (selectedGenres.length === preferenceOptions.genres.length) {
+      setSelectedGenres([]);
+    } else {
+      setSelectedGenres([...preferenceOptions.genres]);
+    }
+  };
+
+  const handleSelectAllMoods = () => {
+    if (selectedMoods.length === preferenceOptions.moods.length) {
+      setSelectedMoods([]);
+    } else {
+      setSelectedMoods([...preferenceOptions.moods]);
+    }
+  };
+
+  const handleReset = () => {
+    setSelectedLangs(['Kannada', 'English', 'Hindi']);
+    setSelectedGenres(['Melody', 'Pop', 'Romantic']);
+    setSelectedMoods(['Chill', 'Romantic']);
+  };
+
+  const handleSave = () => {
+    try {
+      localStorage.setItem('music_pref_languages', JSON.stringify(selectedLangs));
+      localStorage.setItem('music_pref_genres', JSON.stringify(selectedGenres));
+      localStorage.setItem('music_pref_moods', JSON.stringify(selectedMoods));
+    } catch (e) {
+      console.error(e);
+    }
+    
+    const primaryLang = selectedLangs[0]?.toUpperCase();
+    if (primaryLang && ['KANNADA', 'ENGLISH', 'HINDI'].includes(primaryLang)) {
+      onLanguageChange?.(primaryLang);
+    }
+    
+    setLanguageOpen(false);
+  };
+
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -65,6 +167,17 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
   const languageToggleRef = useRef(null);
   const searchShellRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -157,7 +270,7 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
     if (!nextQuery) return;
     setDropdownOpen(false);
     setSearchFocused(false);
-    onSearchSubmit?.({ query: nextQuery, type: result?.type || 'songs' });
+    onSearchSubmit?.({ query: nextQuery, type: result?.type || 'song' });
     setQuery('');
   };
 
@@ -191,7 +304,13 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
         </div>
         <div className="app-header__brand-copy">
           <strong>Music App</strong>
-          {user?.isPremium && <span>Premium Streaming</span>}
+          {isPremium ? (
+            <span className="app-header__premium-tag">
+              <Crown size={9} fill="currentColor" /> Premium
+            </span>
+          ) : (
+            <span>Free Streaming</span>
+          )}
         </div>
       </div>
 
@@ -203,7 +322,13 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
           </div>
           <div className="app-header__brand-copy">
             <strong>Music App</strong>
-            {user?.isPremium && <span>Premium Streaming</span>}
+            {isPremium ? (
+              <span className="app-header__premium-tag">
+                <Crown size={9} fill="currentColor" /> Premium
+              </span>
+            ) : (
+              <span>Free Streaming</span>
+            )}
           </div>
         </div>
 
@@ -222,13 +347,15 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
               >
                 {active && (
                   <motion.span
-                    className="app-header__tab-indicator"
+                    className="app-header__tab-pill-bg"
                     layoutId="header-active-tab"
-                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                   />
                 )}
-                <Icon size={14} />
-                <span>{item.label}</span>
+                <span className="app-header__tab-content">
+                  <Icon size={14} />
+                  <span>{item.label}</span>
+                </span>
               </motion.button>
             );
           })}
@@ -282,6 +409,11 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
                 }, 160);
               }}
             />
+            {!query && !searchFocused && (
+              <span className="app-header__search-kbd">
+                <kbd>Ctrl</kbd><kbd>K</kbd>
+              </span>
+            )}
             {searchExpanded && query && (
               <button
                 type="button"
@@ -335,22 +467,20 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
         </motion.div>
       </div>
 
-      {/* RIGHT: Upgrade to Premium + Bell + Language + Avatar */}
+      {/* RIGHT: Bell + Language + Avatar */}
       <div className="app-header__right">
-
 
         {/* Notification bell */}
         <motion.button
           type="button"
-          className="app-header__icon-btn"
+          className="app-header__icon-btn app-header__notification-btn"
           aria-label="Notifications"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
         >
           <Bell size={18} />
+          <span className="app-header__notification-badge" />
         </motion.button>
-
-
 
         {/* Language selector */}
         <div className="app-header__language">
@@ -364,42 +494,121 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
             whileTap={{ scale: 0.97 }}
           >
             <span className="app-header__language-icon">
-              <Globe2 size={15} />
+              <Sliders size={15} />
             </span>
-            <strong>{selectedLanguage.flag}</strong>
-            <ChevronDown size={13} className={`app-header__chevron ${languageOpen ? 'open' : ''}`} />
+            <strong>Music Preferences</strong>
           </motion.button>
 
           <AnimatePresence>
             {languageOpen && (
               <motion.div
                 ref={languageMenuRef}
-                className="app-header__language-menu"
-                initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                className="app-header__pref-dropdown"
+                initial={{ opacity: 0, y: 15, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
+                exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
               >
-                <div className="app-header__language-menu-header">
-                  <h4>Preferred Music</h4>
-                  <p>Choose the languages you want to discover music in.</p>
+                <div className="app-header__pref-header">
+                  <div>
+                    <h4>Music Preferences</h4>
+                    <p>Customize your music experience</p>
+                  </div>
+                  <button type="button" className="app-header__pref-close" onClick={() => setLanguageOpen(false)} aria-label="Close Preferences">
+                    <X size={16} />
+                  </button>
                 </div>
-                <div className="app-header__language-list">
-                  {languageOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={selectedLanguage.label === option.label ? 'active' : ''}
-                      onClick={() => { onLanguageChange?.(option.value); setLanguageOpen(false); }}
-                    >
-                      <span>{option.flag}</span>
-                      <strong>{option.label}</strong>
-                    </button>
-                  ))}
+
+                <div className="app-header__pref-body">
+                  {/* Languages Section */}
+                  <div className="app-header__pref-section">
+                    <div className="app-header__pref-section-title-row">
+                      <h5><Music2 size={14} /> Languages</h5>
+                      <button type="button" className="app-header__pref-select-all" onClick={handleSelectAllLangs}>
+                        {selectedLangs.length === preferenceOptions.languages.length ? 'Clear All' : 'Select All'}
+                      </button>
+                    </div>
+                    <p className="app-header__pref-section-desc">Select your preferred languages</p>
+                    <div className="app-header__pref-grid">
+                      {preferenceOptions.languages.map((lang) => {
+                        const isSelected = selectedLangs.includes(lang);
+                        return (
+                          <button
+                            key={lang}
+                            type="button"
+                            className={`app-header__pref-chip ${isSelected ? 'selected' : ''}`}
+                            onClick={() => handleToggleLang(lang)}
+                          >
+                            <span>{lang}</span>
+                            {isSelected && <Check size={12} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Genres Section */}
+                  <div className="app-header__pref-section">
+                    <div className="app-header__pref-section-title-row">
+                      <h5><Sliders size={14} /> Favorite Genres</h5>
+                      <button type="button" className="app-header__pref-select-all" onClick={handleSelectAllGenres}>
+                        {selectedGenres.length === preferenceOptions.genres.length ? 'Clear All' : 'Select All'}
+                      </button>
+                    </div>
+                    <p className="app-header__pref-section-desc">Choose the genres you love</p>
+                    <div className="app-header__pref-grid">
+                      {preferenceOptions.genres.map((genre) => {
+                        const isSelected = selectedGenres.includes(genre);
+                        return (
+                          <button
+                            key={genre}
+                            type="button"
+                            className={`app-header__pref-chip ${isSelected ? 'selected' : ''}`}
+                            onClick={() => handleToggleGenre(genre)}
+                          >
+                            <span>{genre}</span>
+                            {isSelected && <Check size={12} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Mood Section */}
+                  <div className="app-header__pref-section">
+                    <div className="app-header__pref-section-title-row">
+                      <h5><Smile size={14} /> Mood</h5>
+                      <button type="button" className="app-header__pref-select-all" onClick={handleSelectAllMoods}>
+                        {selectedMoods.length === preferenceOptions.moods.length ? 'Clear All' : 'Select All'}
+                      </button>
+                    </div>
+                    <p className="app-header__pref-section-desc">Choose your preferred moods</p>
+                    <div className="app-header__pref-grid">
+                      {preferenceOptions.moods.map((mood) => {
+                        const isSelected = selectedMoods.includes(mood);
+                        return (
+                          <button
+                            key={mood}
+                            type="button"
+                            className={`app-header__pref-chip ${isSelected ? 'selected' : ''}`}
+                            onClick={() => handleToggleMood(mood)}
+                          >
+                            <span>{mood}</span>
+                            {isSelected && <Check size={12} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div className="app-header__language-note">
-                  <span>Note</span>
-                  <p>This affects songs and trends. UI language remains in English.</p>
+
+                <div className="app-header__pref-footer">
+                  <button type="button" className="app-header__pref-reset" onClick={handleReset}>
+                    <RefreshCw size={13} /> Reset
+                  </button>
+                  <button type="button" className="app-header__pref-save" onClick={handleSave}>
+                    <Check size={14} /> Save Preferences
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -427,6 +636,11 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
                 <span className="app-header__avatar-online" />
               </div>
               <span className="app-header__avatar-name">{userName || 'Listener'}</span>
+              {isPremium && (
+                <span className="app-header__premium-icon" title="Premium Subscriber">
+                  <Crown size={12} fill="currentColor" />
+                </span>
+              )}
               <ChevronDown size={13} className={`app-header__chevron ${avatarOpen ? 'open' : ''}`} />
             </div>
           </motion.button>
@@ -448,8 +662,15 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
                     style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', display: 'block' }} 
                   />
                   <div>
-                    <strong>{userName || 'Listener'}</strong>
-                    <small>Online now</small>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <strong>{userName || 'Listener'}</strong>
+                      {isPremium && (
+                        <span className="app-header__premium-icon-dropdown" title="Premium Subscriber">
+                          <Crown size={11} fill="currentColor" />
+                        </span>
+                      )}
+                    </div>
+                    <small>{isPremium ? 'Premium Streaming' : 'Free Streaming'}</small>
                   </div>
                 </div>
                 <div className="app-header__menu-divider" />
