@@ -45,6 +45,17 @@ const placeholderPhrases = [
 
 const recentSearches = ['Kannada hits', 'Lo-fi focus', 'Arijit Singh', '90s love songs'];
 
+const readStoredPreference = (key, fallback) => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (!saved) return fallback;
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 function Header({ userName, user, onSearchSubmit, language, onLanguageChange, onLogout, onPlayTrack, onLikeTrack, onQueueTrack, onToggleSidebar }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -70,32 +81,19 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
     moods: ['Chill', 'Happy', 'Romantic', 'Energetic', 'Sad', 'Focus', 'Party', 'Workout']
   }), []);
 
-  const [selectedLangs, setSelectedLangs] = useState(() => {
-    try {
-      const saved = localStorage.getItem('music_pref_languages');
-      return saved ? JSON.parse(saved) : ['Kannada', 'English', 'Hindi'];
-    } catch {
-      return ['Kannada', 'English', 'Hindi'];
-    }
-  });
+  const [selectedLangs, setSelectedLangs] = useState(() =>
+    readStoredPreference('music_pref_languages', ['Kannada', 'English', 'Hindi'])
+  );
 
-  const [selectedGenres, setSelectedGenres] = useState(() => {
-    try {
-      const saved = localStorage.getItem('music_pref_genres');
-      return saved ? JSON.parse(saved) : ['Melody', 'Pop', 'Romantic'];
-    } catch {
-      return ['Melody', 'Pop', 'Romantic'];
-    }
-  });
+  const [selectedGenres, setSelectedGenres] = useState(() =>
+    readStoredPreference('music_pref_genres', ['Melody', 'Pop', 'Romantic'])
+  );
 
-  const [selectedMoods, setSelectedMoods] = useState(() => {
-    try {
-      const saved = localStorage.getItem('music_pref_moods');
-      return saved ? JSON.parse(saved) : ['Chill', 'Romantic'];
-    } catch {
-      return ['Chill', 'Romantic'];
-    }
-  });
+  const [selectedMoods, setSelectedMoods] = useState(() =>
+    readStoredPreference('music_pref_moods', ['Chill', 'Romantic'])
+  );
+
+  const [saveError, setSaveError] = useState('');
 
   const handleToggleLang = (lang) => {
     setSelectedLangs(prev => prev.includes(lang) ? prev.filter(l => l !== lang) : [...prev, lang]);
@@ -137,6 +135,7 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
     setSelectedLangs(['Kannada', 'English', 'Hindi']);
     setSelectedGenres(['Melody', 'Pop', 'Romantic']);
     setSelectedMoods(['Chill', 'Romantic']);
+    setSaveError('');
   };
 
   const handleSave = () => {
@@ -144,8 +143,11 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
       localStorage.setItem('music_pref_languages', JSON.stringify(selectedLangs));
       localStorage.setItem('music_pref_genres', JSON.stringify(selectedGenres));
       localStorage.setItem('music_pref_moods', JSON.stringify(selectedMoods));
+      setSaveError('');
     } catch (e) {
       console.error(e);
+      setSaveError('Failed to save preferences. Local storage is unavailable or full.');
+      return;
     }
     
     const primaryLang = selectedLangs[0]?.toUpperCase();
@@ -518,6 +520,12 @@ function Header({ userName, user, onSearchSubmit, language, onLanguageChange, on
                     <X size={16} />
                   </button>
                 </div>
+
+                {saveError && (
+                  <div className="app-header__pref-error" role="alert" style={{ padding: '8px 12px', margin: '0 16px 12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', fontSize: '12px' }}>
+                    {saveError}
+                  </div>
+                )}
 
                 <div className="app-header__pref-body">
                   {/* Languages Section */}
