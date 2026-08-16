@@ -80,7 +80,7 @@ function PlayerBar({
 
   const resolvedAlbumName = useMemo(() => {
     if (!track) return 'Single';
-    const artistName = track.artist || 'Unknown Artist';
+    const artistName = track.artist || track.channelTitle || 'Unknown Artist';
     const meta = getSongMetadata(track.title, artistName, track.description);
     return extractMovieOrAlbum(track.title, artistName, track.album, track.movie, meta?.album);
   }, [track]);
