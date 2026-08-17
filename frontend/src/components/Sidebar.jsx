@@ -20,6 +20,7 @@ import {
 /* ─── Nav items shown at the top ─── */
 const primaryItems = [
   { label: 'Home', icon: Home, to: '/' },
+  { label: 'Room', icon: UsersRound, to: '/room' },
 ];
 
 /* ─── Browse section ─── */
@@ -28,7 +29,7 @@ const browseItems = [
   { label: 'Top Charts', icon: TrendingUp, to: '/top-charts' },
   { label: 'Top Playlists', icon: ListMusic, to: '/top-playlists' },
   { label: 'Podcasts', icon: Mic2, to: '/podcasts' },
-  { label: 'Top Artists', icon: UsersRound, to: '/artists' },
+  { label: 'Top Artists', icon: UsersRound, to: '/top-artists' },
   { label: 'Radio', icon: Radio, to: '/radio' },
 ];
 
@@ -40,14 +41,6 @@ const libraryItems = [
   { label: 'Albums', icon: Album, to: '/albums' },
   { label: 'Artists', icon: Music2, to: '/artists' },
   { label: 'Downloads', icon: Download, to: '/downloads' },
-];
-
-/* ─── Playlist items ─── */
-const playlistItems = [
-  { label: 'Chill Vibes', color: '#6ee7b7', to: '/coming-soon?feature=Chill%20Vibes' },
-  { label: 'Workout Hits', color: '#fbbf24', to: '/coming-soon?feature=Workout%20Hits' },
-  { label: 'Road Trip', color: '#60a5fa', to: '/coming-soon?feature=Road%20Trip' },
-  { label: 'Bollywood Mix', color: '#f472b6', to: '/coming-soon?feature=Bollywood%20Mix' },
 ];
 
 const MenuIcon = ({ icon: Icon }) => <Icon size={17} strokeWidth={2} />;
@@ -92,7 +85,7 @@ function Sidebar({ onCreatePlaylist, isOpen, onClose, user }) {
                 className={({ isActive }) => `dashboard-library-list__item ${isActive ? 'active' : ''}`}
                 onClick={handleCloseIfCompact}
               >
-                <Icon size={15} strokeWidth={2} />
+                <Icon size={18} strokeWidth={2} />
                 <span>{item.label}</span>
               </NavLink>
             );
@@ -124,7 +117,7 @@ function Sidebar({ onCreatePlaylist, isOpen, onClose, user }) {
                 }}
                 onClick={handleCloseIfCompact}
               >
-                <Icon size={15} strokeWidth={2} />
+                <Icon size={18} strokeWidth={2} />
                 <span>{item.label}</span>
               </NavLink>
             );
@@ -132,34 +125,8 @@ function Sidebar({ onCreatePlaylist, isOpen, onClose, user }) {
         </div>
       </div>
 
-      {/* ── Playlists ──────────────────────────────── */}
-      <div className="dashboard-sidebar__section">
-        <p className="dashboard-sidebar__label">Playlists</p>
-        <div className="dashboard-library-list">
-          {playlistItems.map((pl) => (
-            <NavLink
-              key={pl.label}
-              to={pl.to}
-              className={({ isActive }) => `dashboard-library-list__item sidebar-playlist-item ${isActive ? 'active' : ''}`}
-              onClick={handleCloseIfCompact}
-            >
-              <span
-                className="sidebar-playlist-dot"
-                style={{ background: pl.color }}
-                aria-hidden="true"
-              />
-              <span>{pl.label}</span>
-            </NavLink>
-          ))}
-          <NavLink
-            to="/coming-soon?feature=Playlists"
-            className={({ isActive }) => `dashboard-library-list__item sidebar-show-more ${isActive ? 'active' : ''}`}
-            onClick={handleCloseIfCompact}
-          >
-            <span>Show More</span>
-          </NavLink>
-        </div>
-      </div>
+
+
 
       {/* ── Create Playlist ─────────────────────────── */}
       <div className="sidebar-create-wrap">
