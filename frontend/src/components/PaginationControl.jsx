@@ -4,10 +4,12 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-r
 function PaginationControl({ currentPage = 1, totalPages = 1, onPageChange, isLoading = false }) {
   if (totalPages <= 1) return null;
 
+  const normalizedPage = Math.min(totalPages, Math.max(1, Number(currentPage) || 1));
+
   const getPageNumbers = () => {
     const pages = [];
     const maxVisible = 5;
-    let start = Math.max(1, currentPage - 2);
+    let start = Math.max(1, normalizedPage - 2);
     let end = Math.min(totalPages, start + maxVisible - 1);
 
     if (end - start + 1 < maxVisible) {
@@ -25,7 +27,7 @@ function PaginationControl({ currentPage = 1, totalPages = 1, onPageChange, isLo
   return (
     <div className="pagination-controls-wrapper">
       <div className="pagination-info">
-        Page <span className="pagination-highlight">{currentPage}</span> of{' '}
+        Page <span className="pagination-highlight">{normalizedPage}</span> of{' '}
         <span className="pagination-highlight">{totalPages}</span>
       </div>
 
@@ -35,8 +37,9 @@ function PaginationControl({ currentPage = 1, totalPages = 1, onPageChange, isLo
           type="button"
           className="pagination-btn"
           onClick={() => onPageChange(1)}
-          disabled={currentPage === 1 || isLoading}
+          disabled={normalizedPage === 1 || isLoading}
           title="First Page"
+          aria-label="First Page"
         >
           <ChevronsLeft size={16} />
         </button>
@@ -45,9 +48,10 @@ function PaginationControl({ currentPage = 1, totalPages = 1, onPageChange, isLo
         <button
           type="button"
           className="pagination-btn"
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1 || isLoading}
+          onClick={() => onPageChange(normalizedPage - 1)}
+          disabled={normalizedPage === 1 || isLoading}
           title="Previous Page"
+          aria-label="Previous Page"
         >
           <ChevronLeft size={16} />
         </button>
@@ -57,9 +61,11 @@ function PaginationControl({ currentPage = 1, totalPages = 1, onPageChange, isLo
           <button
             key={p}
             type="button"
-            className={`pagination-number-btn ${p === currentPage ? 'active' : ''}`}
+            className={`pagination-number-btn ${p === normalizedPage ? 'active' : ''}`}
             onClick={() => onPageChange(p)}
             disabled={isLoading}
+            aria-label={`Page ${p}`}
+            aria-current={p === normalizedPage ? 'page' : undefined}
           >
             {p}
           </button>
@@ -69,9 +75,10 @@ function PaginationControl({ currentPage = 1, totalPages = 1, onPageChange, isLo
         <button
           type="button"
           className="pagination-btn"
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages || isLoading}
+          onClick={() => onPageChange(normalizedPage + 1)}
+          disabled={normalizedPage === totalPages || isLoading}
           title="Next Page"
+          aria-label="Next Page"
         >
           <ChevronRight size={16} />
         </button>
@@ -81,8 +88,9 @@ function PaginationControl({ currentPage = 1, totalPages = 1, onPageChange, isLo
           type="button"
           className="pagination-btn"
           onClick={() => onPageChange(totalPages)}
-          disabled={currentPage === totalPages || isLoading}
+          disabled={normalizedPage === totalPages || isLoading}
           title="Last Page"
+          aria-label="Last Page"
         >
           <ChevronsRight size={16} />
         </button>
