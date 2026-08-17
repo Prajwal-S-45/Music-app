@@ -1,15 +1,17 @@
-import { useState } from 'react';
-import { Menu, Music2, Mic2, Radio } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Menu, Music2, Mic2, Radio, UsersRound } from 'lucide-react';
 import '../styles/TopPillBar.css';
 
 const tabs = [
-  { label: 'Music', icon: Music2 },
-  { label: 'Podcasts', icon: Mic2 },
-  { label: 'Radio', icon: Radio },
+  { label: 'Music', icon: Music2, to: '/' },
+  { label: 'Room', icon: UsersRound, to: '/room' },
+  { label: 'Podcasts', icon: Mic2, to: '/podcasts' },
+  { label: 'Radio', icon: Radio, to: '/radio' },
 ];
 
 function TopPillBar({ onToggleSidebar }) {
-  const [activeTab, setActiveTab] = useState('Music');
+  const navigate = useNavigate();
+  const location = useLocation();
 
   return (
     <div className="top-pill-bar">
@@ -25,13 +27,13 @@ function TopPillBar({ onToggleSidebar }) {
       <div className="top-pill-bar__tabs">
         {tabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = activeTab === tab.label;
+          const isActive = location.pathname === tab.to;
           return (
             <button
               key={tab.label}
               type="button"
               className={`top-pill-bar__pill ${isActive ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.label)}
+              onClick={() => navigate(tab.to)}
             >
               <Icon size={16} />
               <span>{tab.label}</span>
