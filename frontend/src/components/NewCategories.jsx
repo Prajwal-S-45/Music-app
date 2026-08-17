@@ -3,7 +3,7 @@ import '../styles/Podcasts.css';
 
 export function PodcastsView() {
   const categories = [
-    { title: 'True Crime', color: '#10b981' },
+    { title: 'True Crime', color: '#6366f1' },
     { title: 'Comedy', color: '#f59e0b' },
     { title: 'News', color: '#3b82f6' },
     { title: 'Technology', color: '#8b5cf6' }
@@ -11,7 +11,7 @@ export function PodcastsView() {
 
   const featured = [
     { title: 'The Daily', publisher: 'The New York Times', color: '#ef4444' },
-    { title: 'Crime Junkie', publisher: 'audiochuck', color: '#10b981' },
+    { title: 'Crime Junkie', publisher: 'audiochuck', color: '#6366f1' },
     { title: 'SmartLess', publisher: 'Jason Bateman', color: '#f59e0b' }
   ];
 
