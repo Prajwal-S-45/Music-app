@@ -217,7 +217,6 @@ function HistoryPage({ token, activeTrackId, onPlayTrack, onSearchSubmit }) {
 
       onPlayTrack?.({
         id: songId,
-        videoId: null,
         title: item.title,
         artist: item.subtitle,
         cover: item.image,
@@ -239,7 +238,7 @@ function HistoryPage({ token, activeTrackId, onPlayTrack, onSearchSubmit }) {
     }
 
     if (item.type === 'artist') {
-      navigate(`/artist/${encodeURIComponent(item.title)}`);
+      navigate(`/artists/${encodeURIComponent(item.title)}`);
     } else if (item.type === 'playlist') {
       navigate('/library');
     } else {
