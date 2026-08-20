@@ -293,7 +293,7 @@ function Playlists({ user: propUser, onUserUpdate, onPlayAll }) {
               </div>
               <div className="library-mobile-grid-text">
                 <strong>Liked Songs</strong>
-                <span>{likedCount || 312} songs</span>
+                <span>{likedCount || 0} songs</span>
               </div>
               <ChevronRight size={18} className="chevron" />
             </button>
