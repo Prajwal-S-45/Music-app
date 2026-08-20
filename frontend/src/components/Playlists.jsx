@@ -78,92 +78,6 @@ function Playlists({ user: propUser, onUserUpdate, onPlayAll }) {
         }
       }
 
-      // Check if mock playlists exist in queues. If not, add them!
-      const mockIds = ['mock-road-trip', 'mock-party-vibes', 'mock-chill-vibes', 'mock-workout-mix', 'mock-romantic-hits', 'mock-long-drive', 'mock-rainy-day', 'mock-acoustic-vibes', 'mock-late-night'];
-      const hasMocks = queues.some(q => mockIds.includes(q.id));
-
-      if (!hasMocks) {
-        const mockPlaylists = [
-          {
-            id: 'mock-road-trip',
-            name: 'Road Trip',
-            songs: Array(24).fill({}),
-            songCount: 24,
-            cover: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=500&q=80',
-            createdAt: Date.now() - 10000
-          },
-          {
-            id: 'mock-party-vibes',
-            name: 'Party Vibes',
-            songs: Array(36).fill({}),
-            songCount: 36,
-            cover: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=500&q=80',
-            createdAt: Date.now() - 20000
-          },
-          {
-            id: 'mock-chill-vibes',
-            name: 'Chill Vibes',
-            songs: Array(28).fill({}),
-            songCount: 28,
-            cover: 'https://images.unsplash.com/photo-1518173946687-a4c8a383392e?auto=format&fit=crop&w=500&q=80',
-            createdAt: Date.now() - 30000
-          },
-          {
-            id: 'mock-workout-mix',
-            name: 'Workout Mix',
-            songs: Array(20).fill({}),
-            songCount: 20,
-            cover: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=500&q=80',
-            createdAt: Date.now() - 40000
-          },
-          {
-            id: 'mock-romantic-hits',
-            name: 'Romantic Hits',
-            songs: Array(31).fill({}),
-            songCount: 31,
-            cover: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=500&q=80',
-            createdAt: Date.now() - 50000
-          },
-          {
-            id: 'mock-long-drive',
-            name: 'Long Drive',
-            songs: Array(22).fill({}),
-            songCount: 22,
-            cover: 'https://images.unsplash.com/photo-1494783367193-149034c05e8f?auto=format&fit=crop&w=500&q=80',
-            createdAt: Date.now() - 60000
-          },
-          {
-            id: 'mock-rainy-day',
-            name: 'Rainy Day',
-            songs: Array(18).fill({}),
-            songCount: 18,
-            cover: 'https://images.unsplash.com/photo-1501691223387-dd0500403074?auto=format&fit=crop&w=500&q=80',
-            createdAt: Date.now() - 70000
-          },
-          {
-            id: 'mock-acoustic-vibes',
-            name: 'Acoustic Vibes',
-            songs: Array(19).fill({}),
-            songCount: 19,
-            cover: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=500&q=80',
-            createdAt: Date.now() - 80000
-          },
-          {
-            id: 'mock-late-night',
-            name: 'Late Night',
-            songs: Array(16).fill({}),
-            songCount: 16,
-            cover: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=500&q=80',
-            createdAt: Date.now() - 90000
-          }
-        ];
-
-        // Filter out duplicates based on names
-        const uniqueMocks = mockPlaylists.filter(mock => !queues.some(q => q.name.toLowerCase() === mock.name.toLowerCase()));
-        queues = [...queues, ...uniqueMocks];
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queues));
-      }
-
       setSavedQueues(queues);
     };
 
@@ -173,10 +87,33 @@ function Playlists({ user: propUser, onUserUpdate, onPlayAll }) {
     return () => {
       window.removeEventListener('savedQueuesUpdated', syncSavedQueues);
       if (clearMessageTimerRef.current) {
-        window.clearTimeout(clearMessageTimerRef.current);
+        clearTimeout(clearMessageTimerRef.current);
       }
     };
   }, []);
+
+  const sortedQueues = useMemo(() => {
+    const queues = savedQueues.slice();
+
+    if (sortBy === 'oldest') {
+      queues.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+    } else if (sortBy === 'az' || sortBy === 'ALPHABETICAL') {
+      queues.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    } else {
+      queues.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    }
+
+    // Liked Songs card injected at the front
+    const likedItem = {
+      id: 'liked-songs',
+      name: 'Liked Songs',
+      songs: [],
+      songCount: likedCount || 0,
+      cover: 'liked-songs-gradient'
+    };
+
+    return [likedItem, ...queues];
+  }, [savedQueues, sortBy, likedCount]);
 
   // Fetch liked songs count from API
   useEffect(() => {
@@ -195,29 +132,6 @@ function Playlists({ user: propUser, onUserUpdate, onPlayAll }) {
       navigate('/artists', { replace: true });
     }
   }, [location.search, navigate]);
-
-  const sortedQueues = useMemo(() => {
-    const queues = savedQueues.slice();
-
-    if (sortBy === 'oldest') {
-      queues.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
-    } else if (sortBy === 'az') {
-      queues.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-    } else {
-      queues.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
-    }
-
-    // Liked Songs card injected at the front
-    const likedItem = {
-      id: 'liked-songs',
-      name: 'Liked Songs',
-      songs: [],
-      songCount: likedCount || 128, // Default to 128 if not fetched, matching mockup
-      cover: 'liked-songs-gradient'
-    };
-
-    return [likedItem, ...queues];
-  }, [savedQueues, sortBy, likedCount]);
 
   const handleDeleteQueue = useCallback((queueId) => {
     deleteSavedQueue(queueId);
