@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   BookmarkPlus,
   ChevronDown,
   ChevronLeft,
   ChevronUp,
+  Clock,
   GripVertical,
+  Heart,
   LayoutList,
   MoreHorizontalIcon,
   Music2,
   Play,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -25,7 +29,7 @@ const formatQueueDuration = (seconds) => {
   return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
 };
 
-const getTrackPlaybackId = (item) => item?.videoId || item?.id;
+const getTrackPlaybackId = (item) => item?.id;
 
 const getQueueItemKey = (item, index) =>
   item?.queueItemId || item?.id || `${item?.title || 'queue-item'}-${index}`;
@@ -45,6 +49,7 @@ function Queue({
   onRemoveQueueItems,
 }) {
   const isExpanded = isCompactLayout ? isOpen : true;
+  const navigate = useNavigate();
   const [saveStatus, setSaveStatus] = useState({ type: '', message: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
@@ -323,10 +328,39 @@ function Queue({
           ref={listRef}
         >
           {items.length === 0 ? (
-            <div className="upnext-panel__empty">
-              <Music2 size={22} />
-              <p>Queue is empty</p>
-              <span>Play a track to start</span>
+            <div className="upnext-panel__empty-wrapper flex flex-col items-center justify-center p-6 text-center">
+              <div className="empty-icon-circle w-14 h-14 rounded-full bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-emerald-400 mb-3 shadow-lg">
+                <Music2 size={24} />
+              </div>
+              <h3 className="text-base font-bold text-slate-100 mb-1">Queue is Empty</h3>
+              <p className="text-xs text-slate-400 mb-5 max-w-[200px]">Play a song to start listening.</p>
+
+              <div className="empty-action-buttons flex flex-col gap-2 w-full max-w-[200px]">
+                <button
+                  type="button"
+                  className="empty-action-btn flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-xs font-semibold text-slate-200 transition-colors"
+                  onClick={() => navigate('/history')}
+                >
+                  <Clock size={13} className="text-emerald-400" />
+                  <span>Recently Played</span>
+                </button>
+                <button
+                  type="button"
+                  className="empty-action-btn flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-xs font-semibold text-slate-200 transition-colors"
+                  onClick={() => navigate('/liked-songs')}
+                >
+                  <Heart size={13} className="text-rose-400" />
+                  <span>Liked Songs</span>
+                </button>
+                <button
+                  type="button"
+                  className="empty-action-btn flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-xs font-semibold text-slate-200 transition-colors"
+                  onClick={() => navigate('/')}
+                >
+                  <Sparkles size={13} className="text-amber-400" />
+                  <span>Recommendations</span>
+                </button>
+              </div>
             </div>
           ) : (
             items.map((item, index) => (
