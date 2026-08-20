@@ -10,7 +10,7 @@ const getDotColor = (name) => {
   if (n.includes('road')) return '#f97316';
   if (n.includes('party')) return '#d946ef';
   if (n.includes('chill')) return '#0ea5e9';
-  if (n.includes('workout')) return '#22c55e';
+  if (n.includes('workout')) return '#64748b';
   if (n.includes('romantic')) return '#f43f5e';
   if (n.includes('long drive')) return '#f97316';
   if (n.includes('rainy')) return '#3b82f6';
@@ -21,7 +21,7 @@ const getDotColor = (name) => {
   for (let i = 0; i < n.length; i++) {
     hash = n.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const colors = ['#3b82f6', '#f97316', '#d946ef', '#0ea5e9', '#22c55e', '#a855f7', '#eab308'];
+  const colors = ['#3b82f6', '#f97316', '#d946ef', '#0ea5e9', '#64748b', '#a855f7', '#eab308'];
   return colors[Math.abs(hash) % colors.length];
 };
 
