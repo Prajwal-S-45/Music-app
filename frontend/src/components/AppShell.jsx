@@ -7,30 +7,44 @@ import SavedQueueDetail from './SavedQueueDetail';
 import LikedSongs from './LikedSongs';
 import HistoryPage from './HistoryPage';
 import SyncedMusicPlayer from './SyncedMusicPlayer';
+import RoomPage from './RoomPage';
+import CoupleMode from './CoupleMode';
 import ExternalStreamPlayer from './ExternalStreamPlayer';
 import DashboardHome from './DashboardHome';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import Queue from './Queue';
+import SettingsPage from '../pages/SettingsPage';
+import ProfilePage from '../pages/ProfilePage';
 import PlayerBar from './PlayerBar';
-import ArtistDetailPage from './ArtistDetailPage';
+import BottomNavigation from './BottomNavigation';
 import apiClient from '../api/client';
 import { buildSongLikePayload } from '../utils/songPayload';
+import { Home, Search as SearchIcon, LibraryBig, Crown } from 'lucide-react';
+import TopPillBar from './TopPillBar';
+import ArtistDetailPage from './ArtistDetailPage';
+import AlbumDetailsPage from './AlbumDetailsPage';
+import ArtistsPage from './ArtistsPage';
+import TopArtistsPage from './TopArtistsPage';
+import CategorySearchPage from './CategorySearchPage';
+import AlbumsPage from './AlbumsPage';
+import ComingSoon from './ComingSoon';
 import '../styles/DashboardLayout.css';
+import '../styles/SidebarTablet.css';
 
 const FALLBACK_TRACK_COVER =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1000&q=80';
 
 const RECENTLY_PLAYED_KEY = 'music_app_recently_played';
 
-const getTrackIdentity = (track) => String(track?.videoId || track?.id || '').trim();
+const getTrackIdentity = (track) => String(track?.id || '').trim();
 
 const normalizePlayableTrack = (song) => {
   if (!song) {
     return null;
   }
 
-  const trackId = song.videoId || song.id;
+  const trackId = song.id;
   if (!trackId) {
     return null;
   }
@@ -38,15 +52,39 @@ const normalizePlayableTrack = (song) => {
   return {
     ...song,
     id: trackId,
-    videoId: trackId,
     title: song.title || 'Untitled Track',
-    artist: song.channelTitle || song.artist || 'Unknown Artist',
-    cover: song.thumbnail || song.cover || song.image || FALLBACK_TRACK_COVER,
+    artist: song.artist || 'Unknown Artist',
+    cover: song.cover || song.thumbnail || song.image || FALLBACK_TRACK_COVER,
     duration: Number(song.duration) || 0,
-    source: song.source || 'youtube',
+    source: song.source || 'jiosaavn',
+    streamUrl: song.file_url || song.streamUrl || '',
   };
 };
-function AppShell({ user, token, onLogout }) {
+
+function SearchRedirect() {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const query = searchParams.get('q') || '';
+  const type = searchParams.get('type') || 'songs';
+  
+  let category = type.toLowerCase();
+  if (category === 'song') category = 'songs';
+  if (category === 'artist') category = 'artists';
+  if (category === 'album') category = 'albums';
+  if (category === 'playlist') category = 'playlists';
+  if (category === 'podcast') category = 'podcasts';
+  if (category === 'movie') category = 'movies';
+
+  const VALID_CATEGORIES = ['songs', 'albums', 'artists', 'playlists', 'podcasts', 'movies'];
+  if (!VALID_CATEGORIES.includes(category)) {
+    category = 'songs';
+  }
+
+  const qParam = query ? `?q=${encodeURIComponent(query)}` : '';
+  return <Navigate to={`/search/${category}${qParam}`} replace />;
+}
+
+function AppShell({ user, token, onLogout, onUserUpdate }) {
   const [recentlyPlayedTracks, setRecentlyPlayedTracks] = useState([]);
   const [likedRefresh, setLikedRefresh] = useState(0);
   const [activeTrack, setActiveTrack] = useState(null);
@@ -83,7 +121,7 @@ function AppShell({ user, token, onLogout }) {
     setRecentlyPlayedTracks((current) => {
       const next = [
         { ...track, playedAt: Date.now() },
-        ...current.filter((item) => (item.videoId || item.id) !== (track.videoId || track.id)),
+        ...current.filter((item) => item.id !== track.id),
       ].slice(0, 30);
       localStorage.setItem(RECENTLY_PLAYED_KEY, JSON.stringify(next));
       return next;
@@ -107,9 +145,6 @@ function AppShell({ user, token, onLogout }) {
     return () => window.removeEventListener('resize', syncLayoutFlags);
   }, []);
 
-  useEffect(() => {
-    navigate('/', { replace: true });
-  }, [user?.id]);
 
   useEffect(() => {
     queueTracksRef.current = queueTracks;
@@ -171,25 +206,6 @@ function AppShell({ user, token, onLogout }) {
 
     lastRouteHistoryRef.current = routeKey;
 
-    if (location.pathname.startsWith('/artist/')) {
-      try {
-        const artistName = decodeURIComponent(location.pathname.replace('/artist/', '')).trim();
-        if (artistName) {
-          recordHistoryItem({
-            type: 'artist',
-            title: artistName,
-            subtitle: 'Artist profile',
-            target: location.pathname,
-          });
-        }
-      } catch (error) {
-        if (!(error instanceof URIError)) {
-          throw error;
-        }
-      }
-      return;
-    }
-
     if (location.pathname.startsWith('/library/saved/')) {
       recordHistoryItem({
         type: 'playlist',
@@ -200,17 +216,22 @@ function AppShell({ user, token, onLogout }) {
       return;
     }
 
-    if (location.pathname === '/library') {
-      const params = new URLSearchParams(location.search);
-      const section = params.get('section');
-      if (section === 'artists') {
-        recordHistoryItem({
-          type: 'artist',
-          title: 'Top Artists',
-          subtitle: 'Viewed artists library',
-          target: '/library?section=artists',
-        });
-      }
+    if (location.pathname === '/artists') {
+      recordHistoryItem({
+        type: 'artist',
+        title: 'Artists',
+        subtitle: 'Viewed artists library',
+        target: '/artists',
+      });
+    }
+
+    if (location.pathname === '/top-artists') {
+      recordHistoryItem({
+        type: 'artist',
+        title: 'Top Artists',
+        subtitle: 'Viewed top artists',
+        target: '/top-artists',
+      });
     }
   }, [location.pathname, location.search, recordHistoryItem]);
 
@@ -259,7 +280,7 @@ function AppShell({ user, token, onLogout }) {
       title: playableTrack.title,
       subtitle: playableTrack.artist,
       image: playableTrack.cover || playableTrack.thumbnail,
-      target: playableTrack.videoId || playableTrack.id,
+      target: playableTrack.id,
       metadata: playableTrack,
     });
   }, [recordHistoryItem, updateRecentlyPlayed]);
@@ -340,13 +361,59 @@ function AppShell({ user, token, onLogout }) {
     setQueueWasCleared(false);
   };
 
+  const handleCreatePlaylist = () => {
+    const name = window.prompt('Enter playlist name:');
+    if (!name || !name.trim()) return;
+
+    const now = Date.now();
+    const queueId = `saved-queue-${now}-${Math.random().toString(36).slice(2, 8)}`;
+    const newQueue = {
+      id: queueId,
+      name: name.trim(),
+      songs: [],
+      songCount: 0,
+      cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80',
+      createdAt: now
+    };
+
+    const STORAGE_KEY = 'music_app_saved_queues_v1';
+    const rawValue = window.localStorage.getItem(STORAGE_KEY);
+    let queues = [];
+    if (rawValue) {
+      try {
+        queues = JSON.parse(rawValue);
+      } catch (e) {
+        queues = [];
+      }
+    }
+    const updatedQueues = [newQueue, ...queues];
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedQueues));
+    window.dispatchEvent(new CustomEvent('savedQueuesUpdated'));
+
+    navigate(`/library/saved/${queueId}`);
+  };
+
   const handleSearchSubmit = (searchValue) => {
-    if (!searchValue) {
-      navigate('/search');
+    const payload = typeof searchValue === 'object' && searchValue !== null ? searchValue : { query: searchValue };
+    const nextQuery = String(payload.query || payload.title || '').trim();
+    let nextType = String(payload.type || 'songs').trim().toLowerCase();
+
+    if (nextType === 'song') nextType = 'songs';
+    if (nextType === 'artist') nextType = 'artists';
+    if (nextType === 'album') nextType = 'albums';
+    if (nextType === 'playlist') nextType = 'playlists';
+    if (nextType === 'podcast') nextType = 'podcasts';
+    if (nextType === 'movie') nextType = 'movies';
+
+    const VALID_CATEGORIES = ['songs', 'albums', 'artists', 'playlists', 'podcasts', 'movies'];
+    const category = VALID_CATEGORIES.includes(nextType) ? nextType : 'songs';
+
+    if (!nextQuery) {
+      navigate(`/search/${category}`);
       return;
     }
 
-    navigate(`/search?q=${encodeURIComponent(searchValue)}`);
+    navigate(`/search/${category}?q=${encodeURIComponent(nextQuery)}`);
   };
 
   const handlePlaySavedQueueSong = (song, queueSongs) => {
@@ -370,13 +437,16 @@ function AppShell({ user, token, onLogout }) {
   };
 
   return (
-    <div className={`dashboard-shell ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+    <div className={`dashboard-shell ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'} ${isCompactLayout ? 'compact' : 'desktop'}`}>
+      {/* SIDEBAR â€” column 1, spans content rows */}
       <Sidebar
+        user={user}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        onCreatePlaylist={() => navigate('/library')}
+        onCreatePlaylist={handleCreatePlaylist}
       />
 
+      {/* Mobile overlay when sidebar open */}
       {isCompactLayout && isSidebarOpen && (
         <button
           type="button"
@@ -386,8 +456,9 @@ function AppShell({ user, token, onLogout }) {
         />
       )}
 
-      {/* Header moved here to span grid columns 2 and 3 (Dashboard + Queue) */}
+      {/* HEADER â€” spans columns 2 and 3 (content + queue) */}
       <Header
+        user={user}
         userName={user?.name || 'Listener'}
         onSearchSubmit={handleSearchSubmit}
         language={language}
@@ -399,114 +470,197 @@ function AppShell({ user, token, onLogout }) {
         onQueueTrack={handleAddToQueue}
       />
 
-      <div className="dashboard-main-shell">
-        <main className="dashboard-content">
-          <div className="dashboard-scroll">
-            <Routes>
-              <Route
-                path="/"
-                element={
-                  <DashboardHome
-                    user={user}
-                    recentlyPlayed={recentlyPlayedTracks}
-                    onTrackSelect={handleHomeTrackSelect}
-                    onAddToQueue={handleAddToQueue}
-                    onLikeTrack={handleLikeTrack}
-                    onTracksLoaded={handleTracksLoaded}
-                  />
-                }
-              />
-              <Route
-                path="/songs"
-                element={
-                  <Player
-                    token={token}
-                    user={user}
-                    activeTrack={activeTrack}
-                    queuedTrack={queueTracks[0] || null}
-                    onLikeUpdate={handleLikeUpdate}
-                  />
-                }
-              />
-              <Route
-                path="/sync"
-                element={
-                  <SyncedMusicPlayer roomId="chill-zone" userName={user?.name || 'Listener'} />
-                }
-              />
-              <Route path="/artists" element={<Navigate to="/library?section=artists" replace />} />
-              <Route path="/artist/:name" element={<ArtistDetailPage onPlayTrack={handleHomeTrackSelect} />} />
-              <Route path="/stream" element={<ExternalStreamPlayer apiEndpoint="/api/music/trending?limit=10" />} />
-              <Route
-                path="/search"
-                element={
-                  <Search
-                    token={token}
-                    onPlayTrack={handlePlayTrack}
-                    onQueueTrack={handleAddToQueue}
-                    onLikeUpdate={handleLikeUpdate}
-                    onHistoryRecord={recordHistoryItem}
-                  />
-                }
-              />
-              <Route
-                path="/library"
-                element={
-                  <Playlists
-                    onPlayAll={handlePlaySavedQueueAll}
-                  />
-                }
-              />
-              <Route
-                path="/library/saved/:queueId"
-                element={
-                  <SavedQueueDetail
-                    onPlaySong={handlePlaySavedQueueSong}
-                    onPlayAll={handlePlaySavedQueueAll}
-                  />
-                }
-              />
-              <Route
-                path="/liked-songs"
-                element={
-                  <LikedSongs
-                    token={token}
-                    refreshSignal={likedRefresh}
-                    userName={user?.name || 'Listener'}
-                    onPlayTrack={handleHomeTrackSelect}
-                    onQueueTrack={handleAddToQueue}
-                  />
-                }
-              />
-              <Route
-                path="/history"
-                element={
-                  <HistoryPage
-                    token={token}
-                    onPlayTrack={handleHomeTrackSelect}
-                    onSearchSubmit={handleSearchSubmit}
-                  />
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <LikedSongs
-                    token={token}
-                    refreshSignal={likedRefresh}
-                    userName={user?.name || 'Listener'}
-                    onPlayTrack={handleHomeTrackSelect}
-                    onQueueTrack={handleAddToQueue}
-                  />
-                }
-              />
-              <Route path="/settings" element={<div className="dashboard-settings-page"><h2>Settings</h2><p>Upload support has been removed from this app.</p></div>} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </div>
-        </main>
-      </div>
+      {/* MAIN CONTENT â€” column 2 */}
+      <main className="dashboard-content">
+        <TopPillBar onToggleSidebar={() => setIsSidebarOpen((value) => !value)} />
+        <div className="dashboard-scroll">
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <DashboardHome
+                  user={user}
+                  language={language}
+                  recentlyPlayed={recentlyPlayedTracks}
+                  onTrackSelect={handleHomeTrackSelect}
+                  onAddToQueue={handleAddToQueue}
+                  onLikeTrack={handleLikeTrack}
+                  onTracksLoaded={handleTracksLoaded}
+                />
+              }
+            />
+            <Route
+              path="/songs"
+              element={
+                <Player
+                  token={token}
+                  user={user}
+                  activeTrack={activeTrack}
+                  queuedTrack={queueTracks[0] || null}
+                  onLikeUpdate={handleLikeUpdate}
+                />
+              }
+            />
+            <Route
+              path="/sync"
+              element={
+                <SyncedMusicPlayer roomId="chill-zone" userName={user?.name || 'Listener'} />
+              }
+            />
+            <Route
+              path="/room"
+              element={
+                <RoomPage user={user} />
+              }
+            />
+            <Route
+              path="/couple"
+              element={
+                <CoupleMode
+                  user={user}
+                  onPlayTrack={handlePlayTrack}
+                  onQueueTrack={handleAddToQueue}
+                />
+              }
+            />
+            <Route
+              path="/artist/:name"
+              element={
+                <ArtistDetailPage
+                  token={token}
+                  onPlayTrack={handlePlayTrack}
+                  onQueueTrack={handleAddToQueue}
+                  onLikeUpdate={handleLikeUpdate}
+                />
+              }
+            />
+            <Route
+              path="/artists/:name"
+              element={
+                <ArtistDetailPage
+                  token={token}
+                  onPlayTrack={handlePlayTrack}
+                  onQueueTrack={handleAddToQueue}
+                  onLikeUpdate={handleLikeUpdate}
+                />
+              }
+            />
+            <Route
+              path="/album/:artistName/:albumName"
+              element={
+                <AlbumDetailsPage
+                  token={token}
+                  onPlayTrack={handlePlayTrack}
+                  onQueueTrack={handleAddToQueue}
+                  onLikeUpdate={handleLikeUpdate}
+                />
+              }
+            />
+            <Route path="/artists" element={<ArtistsPage user={user} />} />
+            <Route path="/top-artists" element={<TopArtistsPage user={user} />} />
+            <Route path="/stream" element={<ExternalStreamPlayer apiEndpoint="/api/music/trending?limit=10" />} />
+            <Route
+              path="/search"
+              element={<SearchRedirect />}
+            />
+            <Route
+              path="/search/:category"
+              element={
+                <CategorySearchPage
+                  token={token}
+                  activeTrackId={activeTrack?.id}
+                  onPlayTrack={handlePlayTrack}
+                  onQueueTrack={handleAddToQueue}
+                  onLikeUpdate={handleLikeUpdate}
+                  onHistoryRecord={recordHistoryItem}
+                />
+              }
+            />
+            <Route
+              path="/library"
+              element={
+                <Playlists
+                  user={user}
+                  onUserUpdate={onUserUpdate}
+                  onPlayAll={handlePlaySavedQueueAll}
+                />
+              }
+            />
+            <Route
+              path="/library/saved/:queueId"
+              element={
+                <SavedQueueDetail
+                  onPlaySong={handlePlaySavedQueueSong}
+                  onPlayAll={handlePlaySavedQueueAll}
+                  activeTrackId={activeTrack?.id}
+                />
+              }
+            />
+            <Route
+              path="/liked-songs"
+              element={
+                <LikedSongs
+                  token={token}
+                  refreshSignal={likedRefresh}
+                  userName={user?.name || 'Listener'}
+                  onPlayTrack={handleHomeTrackSelect}
+                  onQueueTrack={handleAddToQueue}
+                  onPlayAll={handlePlaySavedQueueAll}
+                  onLikeUpdate={handleLikeUpdate}
+                />
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <HistoryPage
+                  token={token}
+                  activeTrackId={activeTrack?.id}
+                  onPlayTrack={handleHomeTrackSelect}
+                  onSearchSubmit={handleSearchSubmit}
+                />
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProfilePage
+                  user={user}
+                  token={token}
+                  onLogout={onLogout}
+                  onUserUpdate={onUserUpdate}
+                  refreshSignal={likedRefresh}
+                  onPlayTrack={handleHomeTrackSelect}
+                  onQueueTrack={handleAddToQueue}
+                />
+              }
+            />
+            <Route path="/settings" element={<SettingsPage user={user} />} />
+            <Route path="/new-releases" element={<ComingSoon />} />
+            <Route path="/top-charts" element={<ComingSoon />} />
+            <Route path="/top-playlists" element={<ComingSoon />} />
+            <Route path="/podcasts" element={<ComingSoon />} />
+            <Route path="/radio" element={<ComingSoon />} />
+            <Route
+              path="/albums"
+              element={
+                <AlbumsPage
+                  token={token}
+                  user={user}
+                  onPlayTrack={handleHomeTrackSelect}
+                  onQueueTrack={handleAddToQueue}
+                />
+              }
+            />
+            <Route path="/downloads" element={<ComingSoon />} />
+            <Route path="/premium" element={<ComingSoon />} />
+            <Route path="/coming-soon" element={<ComingSoon />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+      </main>
 
+      {/* UP NEXT QUEUE â€” column 3 */}
       <Queue
         isOpen={isQueueOpen}
         isCompactLayout={isCompactLayout}
@@ -522,6 +676,7 @@ function AppShell({ user, token, onLogout }) {
         onRemoveQueueItems={handleRemoveQueueItems}
       />
 
+      {/* PLAYER BAR â€” spans all columns */}
       <PlayerBar
         track={activeTrack || queueTracks[0] || null}
         queue={queueTracks}
@@ -531,6 +686,8 @@ function AppShell({ user, token, onLogout }) {
         onSelectTrack={handleHomeTrackSelect}
         onToggleQueue={() => setIsQueueOpen((value) => !value)}
         onLikeUpdate={handleLikeUpdate}
+        onRemoveQueueItem={handleRemoveQueueItem}
+        onClearQueue={handleClearQueue}
       />
 
       {queueNotice && (
@@ -538,6 +695,7 @@ function AppShell({ user, token, onLogout }) {
           {queueNotice}
         </div>
       )}
+      <BottomNavigation />
     </div>
   );
 }
