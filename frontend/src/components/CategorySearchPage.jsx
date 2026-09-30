@@ -199,7 +199,7 @@ function CategorySearchPage({ token, activeTrackId, onPlayTrack, onQueueTrack, o
       <div className="search-page-shell__glow search-page-shell__glow--left" />
       <div className="search-page-shell__glow search-page-shell__glow--right" />
 
-      <div className="search-page-shell__content mx-auto w-full max-w-7xl pb-24 pt-20 px-4 md:px-8 md:pb-10 md:pt-28">
+      <div className="search-page-shell__content mx-auto w-full max-w-7xl pb-24 pt-6 px-4 md:px-8 md:pb-10 md:pt-8">
         {/* Category Navigation Tabs */}
         <SearchCategoryTabs activeCategory={category} query={query} />
 
