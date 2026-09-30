@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import useSocketRoom from '../hooks/useSocketRoom';
 import SyncedMusicPlayer from './SyncedMusicPlayer';
+import CustomizeRoomModal from './CustomizeRoomModal';
 import apiClient from '../api/client';
 import '../styles/RoomPage.css';
 
@@ -51,6 +52,26 @@ function RoomPage({ user }) {
   const [privacy, setPrivacy] = useState('public'); // 'public' | 'friends' | 'private'
   const [allowGuestAdd, setAllowGuestAdd] = useState(true);
   const [selectedTheme, setSelectedTheme] = useState(BACKGROUND_IMAGES.createRoom);
+
+  // Customize Room Modal state
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const [customSettings, setCustomSettings] = useState({
+    theme: BACKGROUND_IMAGES.createRoom,
+    accentColor: 'cyan',
+    audioQuality: 'high',
+    maxQueueLimit: '10',
+    allowGuestPlayPause: true,
+    filterExplicit: false,
+    ambientSound: 'none',
+    welcomeMessage: 'Welcome to the room! Let us vibe together 🎉',
+  });
+
+  const handleSaveCustomization = (newSettings) => {
+    setCustomSettings(newSettings);
+    if (newSettings.theme) {
+      setSelectedTheme(newSettings.theme);
+    }
+  };
 
   // Join Room state
   const [pinDigits, setPinDigits] = useState(['', '', '', '', '', '']);
@@ -478,6 +499,7 @@ function RoomPage({ user }) {
           <button
             type="button"
             className="room-secondary-outline-btn room-btn-full"
+            onClick={() => setIsCustomizeOpen(true)}
           >
             <Settings size={16} />
             <span>Customize Room</span>
@@ -612,6 +634,16 @@ function RoomPage({ user }) {
               <button
                 type="button"
                 className="room-share-link-btn"
+                onClick={() => setIsCustomizeOpen(true)}
+                title="Customize Room"
+              >
+                <Settings size={16} />
+                <span>Customize</span>
+              </button>
+
+              <button
+                type="button"
+                className="room-share-link-btn"
                 onClick={handleCopyRoomId}
               >
                 {copied ? <Check size={16} color="#e2e8f0" /> : <Copy size={16} />}
@@ -654,6 +686,14 @@ function RoomPage({ user }) {
           </div>
         </div>
       )}
+
+      {/* Customize Room Modal */}
+      <CustomizeRoomModal
+        isOpen={isCustomizeOpen}
+        onClose={() => setIsCustomizeOpen(false)}
+        initialSettings={customSettings}
+        onSave={handleSaveCustomization}
+      />
     </div>
   );
 }
