@@ -1,31 +1,15 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
+import {
   Camera, PenTool, Lock, Award, CreditCard, Settings as SettingsIcon, LogOut,
   Plus, CheckCircle2, ChevronRight, ArrowLeft, History, User, Check,
-  Music, Download, Headphones, X, ShieldAlert, Heart, ChevronLeft, Users, Clock
+  Music, Download, Headphones, X, ShieldAlert, Heart, ChevronLeft, Users, Clock, Trash2
 } from 'lucide-react';
 import apiClient from '../api/client';
+import { getSavedQueues, deleteSavedQueue, saveQueueToLibrary } from '../utils/savedQueues';
 import '../styles/ProfilePage.css';
 
-// Fallback lists from image representation
-const DEFAULT_PLAYLISTS = [
-  { id: 'mock-1', name: 'Chill Vibes', count: 25, cover: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&w=500&q=80' },
-  { id: 'mock-2', name: 'Workout Hits', count: 18, cover: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=500&q=80' },
-  { id: 'mock-3', name: 'Road Trip', count: 32, cover: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=500&q=80' },
-  { id: 'mock-4', name: 'Bollywood Mix', count: 42, cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80' },
-  { id: 'mock-5', name: 'Feel Good', count: 30, cover: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=500&q=80' }
-];
-
-const DEFAULT_ARTISTS = [
-  { id: 'arijit', name: 'Arijit Singh', role: 'Singer', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80' },
-  { id: 'atif', name: 'Atif Aslam', role: 'Singer', image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80' },
-  { id: 'pritam', name: 'Pritam', role: 'Music Director', image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=300&q=80' },
-  { id: 'allu', name: 'Allu Arjun', role: 'Actor', image: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=300&q=80' },
-  { id: 'prabhas', name: 'Prabhas', role: 'Actor', image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=300&q=80' },
-  { id: 'rashmika', name: 'Rashmika Mandanna', role: 'Actor', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80' },
-  { id: 'anirudh', name: 'Anirudh Ravichander', role: 'Music Director', image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=300&q=80' }
-];
+// Pre-set avatars for profile selection
 
 const PRESET_AVATARS = [
   'http://localhost:5000/uploads/profile_avatar.png',
@@ -37,13 +21,85 @@ const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80'
 ];
 
+function ProfileArtistAvatar({ artist }) {
+  const name = artist?.name || '';
+  const initialImg = artist?.image || artist?.avatar || artist?.thumbnail || artist?.cover || artist?.img || artist?.picture || '';
+
+  const [src, setSrc] = useState(
+    initialImg && typeof initialImg === 'string' && initialImg.startsWith('http')
+      ? initialImg
+      : ''
+  );
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (initialImg && typeof initialImg === 'string' && initialImg.startsWith('http') && !hasError) {
+      setSrc(initialImg);
+    } else if (name) {
+      apiClient.get(`/api/music/artist-image?name=${encodeURIComponent(name)}`)
+        .then(res => {
+          if (isMounted && res.data?.url) {
+            setSrc(res.data.url);
+          }
+        })
+        .catch(() => { });
+    }
+    return () => { isMounted = false; };
+  }, [name, initialImg, hasError]);
+
+  const handleError = () => {
+    if (!hasError && name) {
+      setHasError(true);
+      apiClient.get(`/api/music/artist-image?name=${encodeURIComponent(name)}`)
+        .then(res => {
+          if (res.data?.url) {
+            setSrc(res.data.url);
+          }
+        })
+        .catch(() => { });
+    }
+  };
+
+  if (!src || (hasError && !src)) {
+    const letter = name ? name.charAt(0).toUpperCase() : 'A';
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #1e293b, #334155)',
+          color: '#38bdf8',
+          fontWeight: 700,
+          fontSize: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        {letter}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name}
+      onError={handleError}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+    />
+  );
+}
+
 function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPlayTrack, onQueueTrack }) {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
   // States
   const [profile, setProfile] = useState(user);
-  const [activeTab, setActiveTab] = useState('Overview');
+  const [activeTab, setActiveTab] = useState('Playlists');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
 
@@ -54,7 +110,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  
+
   // Modals
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -91,8 +147,18 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
     { id: 1, brand: 'Visa', last4: '4321', holder: 'Prajwal S A', expiry: '12/28' }
   ]);
 
-  // Form notifications
   const [formMsg, setFormMsg] = useState({ text: '', type: '' });
+
+  // Format artist role (Singer, Artist, etc.)
+  const getArtistRole = (artist) => {
+    if (!artist) return 'Artist';
+    const role = artist.role || artist.type || artist.subtitle;
+    if (!role || typeof role !== 'string') return 'Artist';
+    const cleanRole = role.trim();
+    const isLanguage = ['hindi', 'english', 'punjabi', 'tamil', 'telugu', 'kannada', 'marathi', 'bengali', 'malayalam'].includes(cleanRole.toLowerCase());
+    if (isLanguage) return 'Singer';
+    return cleanRole.charAt(0).toUpperCase() + cleanRole.slice(1);
+  };
 
   // Load latest user profile from API on mount
   useEffect(() => {
@@ -118,45 +184,167 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
   }, [token]);
 
   // Load playlists, liked songs, follows, recently played, history
+  const syncAllPlaylists = useCallback(async () => {
+    setLoadingPlaylists(true);
+    try {
+      // Blacklist filter for requested items to delete
+      const isBlacklisted = (name) => {
+        if (!name) return false;
+        const n = String(name).trim().toLowerCase();
+        const blacklist = [
+          'liked songs',
+          'saved queue',
+          'praj',
+          'road trip',
+          'party vibes',
+          'chill vibes',
+          'workout',
+          'romantic',
+          'long drive',
+          'rainy day',
+          'acoustic',
+          'late night'
+        ];
+        return blacklist.some(term => n.includes(term));
+      };
+
+      // 1. DB Playlists
+      let dbPlaylists = [];
+      try {
+        const res = await apiClient.get('/api/playlists');
+        dbPlaylists = Array.isArray(res.data) ? res.data : [];
+      } catch (err) {
+        console.warn('Could not fetch DB playlists:', err);
+      }
+
+      // 2. Local Saved Queues (from savedQueues.js)
+      const v1Queues = getSavedQueues();
+
+      // 3. Legacy Local Saved Queues
+      let legacyQueues = [];
+      try {
+        const legacyStr = localStorage.getItem('music_app_saved_queues');
+        legacyQueues = legacyStr ? JSON.parse(legacyStr) : [];
+      } catch { }
+
+      // 4. Liked / Saved External Playlists
+      let likedPlaylists = [];
+      try {
+        const likedStr = localStorage.getItem('music_app_liked_playlists');
+        likedPlaylists = likedStr ? JSON.parse(likedStr) : [];
+      } catch { }
+
+      // 5. Purge blacklisted playlists from localStorage
+      try {
+        const v1Str = localStorage.getItem('music_app_saved_queues_v1');
+        if (v1Str) {
+          const parsed = JSON.parse(v1Str);
+          const filtered = parsed.filter(p => !isBlacklisted(p.name));
+          if (filtered.length !== parsed.length) {
+            localStorage.setItem('music_app_saved_queues_v1', JSON.stringify(filtered));
+          }
+        }
+        const legacyStr = localStorage.getItem('music_app_saved_queues');
+        if (legacyStr) {
+          const parsed = JSON.parse(legacyStr);
+          const filtered = parsed.filter(p => !isBlacklisted(p.name));
+          if (filtered.length !== parsed.length) {
+            localStorage.setItem('music_app_saved_queues', JSON.stringify(filtered));
+          }
+        }
+        const likedStr = localStorage.getItem('music_app_liked_playlists');
+        if (likedStr) {
+          const parsed = JSON.parse(likedStr);
+          const filtered = parsed.filter(p => !isBlacklisted(p.title || p.name));
+          if (filtered.length !== parsed.length) {
+            localStorage.setItem('music_app_liked_playlists', JSON.stringify(filtered));
+          }
+        }
+      } catch (e) {
+        console.warn('Error purging local blacklisted playlists:', e);
+      }
+
+      // 6. Delete blacklisted DB playlists via API
+      for (const p of dbPlaylists) {
+        if (isBlacklisted(p.name)) {
+          try {
+            await apiClient.delete(`/api/playlists/${p.id}`);
+          } catch { }
+        }
+      }
+
+      const validDb = dbPlaylists.filter(p => !isBlacklisted(p.name));
+
+      // Map and deduplicate local queues
+      const localMap = new Map();
+      v1Queues.forEach(q => {
+        if (q && q.id && !isBlacklisted(q.name)) {
+          localMap.set(String(q.id), {
+            id: q.id,
+            name: q.name || 'Saved Playlist',
+            count: q.songs?.length || q.songCount || 0,
+            cover: q.cover || q.songs?.[0]?.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80',
+            isLocal: true,
+            type: 'Saved Queue'
+          });
+        }
+      });
+
+      legacyQueues.forEach(q => {
+        if (q && q.id && !isBlacklisted(q.name) && !localMap.has(String(q.id))) {
+          localMap.set(String(q.id), {
+            id: q.id,
+            name: q.name || 'Saved Playlist',
+            count: q.songs?.length || 0,
+            cover: q.cover || q.songs?.[0]?.cover || 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=500&q=80',
+            isLocal: true,
+            type: 'Local Playlist'
+          });
+        }
+      });
+
+      const formattedDb = validDb.map(p => ({
+        id: p.id,
+        name: p.name,
+        count: p.song_count || 0,
+        cover: p.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80',
+        description: p.description,
+        isDb: true,
+        type: 'Created'
+      }));
+
+      const formattedLikedExt = likedPlaylists
+        .filter(p => !isBlacklisted(p.title || p.name))
+        .map(p => ({
+          id: p.id,
+          name: p.title || p.name || 'Saved Playlist',
+          count: p.songCount || p.songs?.length || 0,
+          cover: p.cover || p.image || p.thumbnail || 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=500&q=80',
+          isLikedPlaylist: true,
+          type: 'Liked'
+        }));
+
+      const combined = [
+        ...formattedDb,
+        ...Array.from(localMap.values()),
+        ...formattedLikedExt
+      ];
+
+      // Keep ONLY the last two playlists
+      const lastTwo = combined.slice(Math.max(0, combined.length - 2));
+
+      setPlaylists(lastTwo);
+    } catch (err) {
+      console.error('Failed to sync playlists:', err);
+    } finally {
+      setLoadingPlaylists(false);
+    }
+  }, []);
+
   useEffect(() => {
     const loadAllData = async () => {
       // 1. Playlists
-      setLoadingPlaylists(true);
-      try {
-        const res = await apiClient.get('/api/playlists');
-        const dbPlaylists = Array.isArray(res.data) ? res.data : [];
-        
-        // Grab from localStorage saved queues too
-        let localSaved = [];
-        try {
-          const savedStr = localStorage.getItem('music_app_saved_queues');
-          localSaved = savedStr ? JSON.parse(savedStr) : [];
-        } catch {}
-
-        // Combine
-        const combined = [
-          ...dbPlaylists.map(p => ({
-            id: p.id,
-            name: p.name,
-            count: 0, // Will fetch counts if needed or display default
-            cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80',
-            description: p.description,
-            isDb: true
-          })),
-          ...localSaved.map(p => ({
-            id: p.id,
-            name: p.name,
-            count: p.songs?.length || 0,
-            cover: p.songs?.[0]?.cover || 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=500&q=80',
-            isLocal: true
-          }))
-        ];
-        setPlaylists(combined);
-      } catch (err) {
-        console.error('Failed to load playlists:', err);
-      } finally {
-        setLoadingPlaylists(false);
-      }
+      await syncAllPlaylists();
 
       // 2. Liked Songs
       try {
@@ -169,14 +357,31 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
       // 3. Followed Artists
       try {
         const saved = localStorage.getItem('music_app_followed_artists');
-        setFollowedArtists(saved ? JSON.parse(saved) : []);
-      } catch {}
+        const list = saved ? JSON.parse(saved) : [];
+        setFollowedArtists(list);
+
+        // Auto-enrich any followed artists missing images via API
+        list.forEach(async (a) => {
+          if (!a.image || !a.image.startsWith('http') || a.image.includes('unsplash.com')) {
+            try {
+              const imgRes = await apiClient.get(`/api/music/artist-image?name=${encodeURIComponent(a.name)}`);
+              if (imgRes.data?.url) {
+                setFollowedArtists(prev => {
+                  const updated = prev.map(item => item.name.toLowerCase() === a.name.toLowerCase() ? { ...item, image: imgRes.data.url } : item);
+                  try { localStorage.setItem('music_app_followed_artists', JSON.stringify(updated)); } catch { }
+                  return updated;
+                });
+              }
+            } catch { }
+          }
+        });
+      } catch { }
 
       // 4. Recently Played
       try {
         const saved = localStorage.getItem('music_app_recently_played');
         setRecentlyPlayed(saved ? JSON.parse(saved) : []);
-      } catch {}
+      } catch { }
 
       // 5. History
       try {
@@ -189,16 +394,29 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
 
     loadAllData();
 
-    // Event listener for updates on follow status
+    // Listeners for updates across the app
     const handleFollowsUpdate = () => {
       try {
         const saved = localStorage.getItem('music_app_followed_artists');
         setFollowedArtists(saved ? JSON.parse(saved) : []);
-      } catch {}
+      } catch { }
     };
+    const handlePlaylistUpdate = () => syncAllPlaylists();
+
     window.addEventListener('followedArtistsUpdated', handleFollowsUpdate);
-    return () => window.removeEventListener('followedArtistsUpdated', handleFollowsUpdate);
-  }, [token, refreshSignal]);
+    window.addEventListener('savedQueuesUpdated', handlePlaylistUpdate);
+    window.addEventListener('playlistsUpdated', handlePlaylistUpdate);
+    window.addEventListener('likedPlaylistsUpdated', handlePlaylistUpdate);
+    window.addEventListener('storage', handlePlaylistUpdate);
+
+    return () => {
+      window.removeEventListener('followedArtistsUpdated', handleFollowsUpdate);
+      window.removeEventListener('savedQueuesUpdated', handlePlaylistUpdate);
+      window.removeEventListener('playlistsUpdated', handlePlaylistUpdate);
+      window.removeEventListener('likedPlaylistsUpdated', handlePlaylistUpdate);
+      window.removeEventListener('storage', handlePlaylistUpdate);
+    };
+  }, [token, refreshSignal, syncAllPlaylists]);
 
   const showNotification = (text, type = 'success') => {
     setFormMsg({ text, type });
@@ -285,45 +503,152 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
     showNotification('Card removed');
   };
 
-  // Create playlist triggers redirection or local modal
+  // Create & Delete playlist helpers
   const handleCreatePlaylist = async () => {
     const name = prompt('Enter playlist name:');
-    if (!name) return;
+    if (!name || !name.trim()) return;
+    const cleanName = name.trim();
+
     try {
-      await apiClient.post('/api/playlists/create', { name, description: '' });
-      // Reload playlists
-      const res = await apiClient.get('/api/playlists');
-      setPlaylists(prev => [
-        ...res.data.map(p => ({
-          id: p.id,
-          name: p.name,
-          count: 0,
-          cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80',
-          isDb: true
-        })),
-        ...prev.filter(x => x.isLocal)
-      ]);
+      saveQueueToLibrary({ name: cleanName, songs: [] });
       showNotification('Playlist created successfully!');
-    } catch (err) {
-      console.error(err);
-      // Fallback local storage creation
+    } catch (e) {
+      const now = Date.now();
+      const queueId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `saved-queue-${now}-${Math.random().toString(36).slice(2, 8)}`;
+      const fallbackQueue = {
+        id: queueId,
+        name: cleanName,
+        songs: [],
+        songCount: 0,
+        cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80',
+        createdAt: now
+      };
+      const STORAGE_KEY = 'music_app_saved_queues_v1';
+      let queues = [];
       try {
-        const savedStr = localStorage.getItem('music_app_saved_queues');
-        const localSaved = savedStr ? JSON.parse(savedStr) : [];
-        const newLocal = {
-          id: `local-${Date.now()}`,
-          name,
-          songs: [],
-          createdAt: Date.now()
-        };
-        localSaved.push(newLocal);
-        localStorage.setItem('music_app_saved_queues', JSON.stringify(localSaved));
-        setPlaylists(prev => [...prev, { id: newLocal.id, name: newLocal.name, count: 0, cover: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=500&q=80', isLocal: true }]);
-        showNotification('Playlist created locally');
-      } catch (localErr) {
-        showNotification('Could not create playlist', 'error');
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (raw) queues = JSON.parse(raw);
+      } catch { }
+      queues.unshift(fallbackQueue);
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queues));
+      window.dispatchEvent(new CustomEvent('savedQueuesUpdated'));
+      showNotification('Playlist created successfully!');
+    }
+
+    try {
+      await apiClient.post('/api/playlists/create', { name: cleanName, description: '' });
+    } catch (err) {
+      console.warn('API creation skipped or failed:', err);
+    }
+
+    syncAllPlaylists();
+  };
+
+  const handleDeletePlaylist = async (e, playlist) => {
+    e.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete "${playlist.name}"?`)) return;
+
+    if (playlist.isLocal) {
+      deleteSavedQueue(playlist.id);
+      try {
+        const legacyStr = localStorage.getItem('music_app_saved_queues');
+        if (legacyStr) {
+          const legacyArr = JSON.parse(legacyStr).filter(q => q.id !== playlist.id);
+          localStorage.setItem('music_app_saved_queues', JSON.stringify(legacyArr));
+        }
+      } catch { }
+      window.dispatchEvent(new CustomEvent('savedQueuesUpdated'));
+      showNotification('Playlist deleted');
+      syncAllPlaylists();
+    } else if (playlist.isDb) {
+      try {
+        await apiClient.delete(`/api/playlists/${playlist.id}`);
+        showNotification('Playlist deleted');
+        syncAllPlaylists();
+      } catch (err) {
+        showNotification('Could not delete playlist', 'error');
+      }
+    } else if (playlist.isLikedPlaylist) {
+      try {
+        const likedStr = localStorage.getItem('music_app_liked_playlists');
+        if (likedStr) {
+          const likedArr = JSON.parse(likedStr).filter(p => p.id !== playlist.id);
+          localStorage.setItem('music_app_liked_playlists', JSON.stringify(likedArr));
+          window.dispatchEvent(new CustomEvent('likedPlaylistsUpdated'));
+        }
+      } catch { }
+      showNotification('Removed from saved playlists');
+    }
+  };
+
+  // Remove handlers for tabs
+  const handleRemoveLikedSong = async (songId) => {
+    try {
+      await apiClient.delete(`/api/music/liked-songs/${songId}`);
+    } catch (err) {
+      try {
+        await apiClient.delete(`/api/music/liked/${songId}`);
+      } catch (e) {
+        console.warn('API unlike failed:', e);
       }
     }
+    setLikedSongs(prev => prev.filter(s => (s.song_id || s.id) !== songId));
+    showNotification('Song removed from Liked Songs');
+  };
+
+  const handleUnfollowArtist = (artistId, artistName) => {
+    try {
+      const saved = localStorage.getItem('music_app_followed_artists');
+      let list = saved ? JSON.parse(saved) : [];
+      list = list.filter(a => (a.id !== artistId && a.name !== artistName));
+      localStorage.setItem('music_app_followed_artists', JSON.stringify(list));
+      window.dispatchEvent(new CustomEvent('followedArtistsUpdated'));
+      setFollowedArtists(list);
+      showNotification(`Unfollowed ${artistName || 'artist'}`);
+    } catch (err) {
+      console.error('Failed to unfollow artist:', err);
+    }
+  };
+
+  const handleRemoveRecentlyPlayedTrack = (trackIndex) => {
+    try {
+      const saved = localStorage.getItem('music_app_recently_played');
+      let list = saved ? JSON.parse(saved) : [];
+      list = list.filter((_, idx) => idx !== trackIndex);
+      localStorage.setItem('music_app_recently_played', JSON.stringify(list));
+      setRecentlyPlayed(list);
+      showNotification('Track removed from Recently Played');
+    } catch (err) {
+      console.error('Failed to remove track:', err);
+    }
+  };
+
+  const handleClearRecentlyPlayed = () => {
+    if (!window.confirm('Clear all recently played tracks?')) return;
+    localStorage.removeItem('music_app_recently_played');
+    setRecentlyPlayed([]);
+    showNotification('Recently Played cleared');
+  };
+
+  const handleDeleteHistoryItem = async (itemId) => {
+    try {
+      await apiClient.delete(`/api/history/${itemId}`);
+    } catch (err) {
+      console.warn('API history delete failed:', err);
+    }
+    setHistoryItems(prev => prev.filter(item => item.id !== itemId));
+    showNotification('History item removed');
+  };
+
+  const handleClearHistory = async () => {
+    if (!window.confirm('Clear all listening history?')) return;
+    try {
+      await apiClient.delete('/api/history');
+    } catch (err) {
+      console.warn('API history clear failed:', err);
+    }
+    setHistoryItems([]);
+    showNotification('Listening history cleared');
   };
 
   // Profile photo check
@@ -337,18 +662,18 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
         <div className="mobile-profile-layout">
           <div className="mobile-profile__banner-cover">
             <div className="mobile-profile__nav-bar">
-              <button 
+              <button
                 type="button"
-                className="mobile-profile__circle-btn" 
-                onClick={() => navigate(-1)} 
+                className="mobile-profile__circle-btn"
+                onClick={() => navigate(-1)}
                 title="Go Back"
               >
                 <ChevronLeft size={20} />
               </button>
-              <button 
+              <button
                 type="button"
-                className="mobile-profile__circle-btn" 
-                onClick={() => setShowSettingsDrawer(true)} 
+                className="mobile-profile__circle-btn"
+                onClick={() => setShowSettingsDrawer(true)}
                 title="Settings"
               >
                 <SettingsIcon size={20} />
@@ -357,12 +682,12 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
 
             <div className="mobile-profile__user-row">
               <div className="mobile-profile__avatar-wrap">
-                <img 
-                  src={profile?.avatar || 'http://localhost:5000/uploads/profile_avatar.png'} 
-                  alt={profile?.name} 
-                  className="mobile-profile__avatar-img" 
+                <img
+                  src={profile?.avatar || 'http://localhost:5000/uploads/profile_avatar.png'}
+                  alt={profile?.name}
+                  className="mobile-profile__avatar-img"
                 />
-                <button 
+                <button
                   type="button"
                   className="mobile-profile__avatar-edit"
                   onClick={() => setShowEditModal(true)}
@@ -380,7 +705,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
           </div>
 
           <div className="mobile-profile__content">
-            {activeTab === 'Overview' ? (
+            {activeTab === 'Playlists' ? (
               <>
                 <div className="mobile-profile__stats-card">
                   <button type="button" className="mobile-profile__stat-item" onClick={() => setActiveTab('Liked Songs')}>
@@ -399,7 +724,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                     <span className="value">24</span>
                   </button>
 
-                  <button type="button" className="mobile-profile__stat-item" onClick={() => setActiveTab('History')}>
+                  <button type="button" className="mobile-profile__stat-item" onClick={() => navigate('/history')}>
                     <div className="mobile-profile__stat-icon history">
                       <Clock size={18} />
                     </div>
@@ -407,12 +732,12 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                     <span className="value">Recent</span>
                   </button>
 
-                  <button type="button" className="mobile-profile__stat-item" onClick={() => setActiveTab('Following')}>
+                  <button type="button" className="mobile-profile__stat-item" onClick={() => setActiveTab('Artists')}>
                     <div className="mobile-profile__stat-icon following">
                       <Users size={18} />
                     </div>
-                    <span className="label">Following</span>
-                    <span className="value">Artists</span>
+                    <span className="label">Artists</span>
+                    <span className="value">Followed</span>
                   </button>
                 </div>
 
@@ -425,7 +750,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                       </div>
                       <h3 className="mobile-profile__empty-title">No Playlists Yet</h3>
                       <p className="mobile-profile__empty-desc">Create your first playlist and it will show up here.</p>
-                      <button 
+                      <button
                         type="button"
                         className="mobile-profile__purple-btn"
                         onClick={handleCreatePlaylist}
@@ -436,9 +761,9 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                   ) : (
                     <div className="playlists-horizontal-grid">
                       {playlists.slice(0, 4).map(p => (
-                        <div 
-                          key={p.id} 
-                          className="playlist-item-card" 
+                        <div
+                          key={p.id}
+                          className="playlist-item-card"
                           onClick={() => p.isLocal ? navigate(`/library/saved/${p.id}`) : navigate('/library')}
                         >
                           <div className="playlist-item-card__image-container">
@@ -468,21 +793,21 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                     </div>
 
                     <div className="mobile-profile__quick-card" onClick={() => setActiveTab('Downloads')}>
-                      <Download size={20} color="#22c55e" />
+                      <Download size={20} color="#e2e8f0" />
                       <strong>Downloads</strong>
                       <span>24 songs</span>
                     </div>
 
-                    <div className="mobile-profile__quick-card" onClick={() => setActiveTab('History')}>
+                    <div className="mobile-profile__quick-card" onClick={() => navigate('/history')}>
                       <Clock size={20} color="#f97316" />
                       <strong>History</strong>
                       <span>Recently played</span>
                     </div>
 
-                    <div className="mobile-profile__quick-card" onClick={() => setActiveTab('Following')}>
+                    <div className="mobile-profile__quick-card" onClick={() => setActiveTab('Artists')}>
                       <Users size={20} color="#3b82f6" />
-                      <strong>Following</strong>
-                      <span>Artists</span>
+                      <strong>Artists</strong>
+                      <span>Followed artists</span>
                     </div>
                   </div>
                 </div>
@@ -490,10 +815,10 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
             ) : (
               /* Mobile subviews */
               <div className="mobile-profile__subview">
-                <button 
-                  type="button" 
-                  className="mobile-profile__subview-back-btn" 
-                  onClick={() => setActiveTab('Overview')}
+                <button
+                  type="button"
+                  className="mobile-profile__subview-back-btn"
+                  onClick={() => setActiveTab('Playlists')}
                   style={{
                     backgroundColor: 'rgba(255,255,255,0.06)',
                     color: '#ffffff',
@@ -509,29 +834,85 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                     gap: '6px'
                   }}
                 >
-                  ← Back to Profile Overview
+                  ← Back to Profile
                 </button>
 
                 {activeTab === 'Playlists' && (
                   <div className="tab-view__grid">
                     <div className="tab-view__grid-header">
-                      <h2>Your Playlists</h2>
+                      <h2>Your Saved & Liked Playlists</h2>
                       <button className="premium-profile__btn-glow" onClick={handleCreatePlaylist}>
                         <Plus size={16} /> Create Playlist
                       </button>
                     </div>
                     <div className="playlists-grid-layout">
-                      {(playlists.length > 0 ? playlists : DEFAULT_PLAYLISTS).map(playlist => (
-                        <div 
-                          key={playlist.id} 
+                      {playlists.length === 0 ? (
+                        <div className="empty-tab-state" style={{ gridColumn: '1 / -1' }}>
+                          <Music size={48} className="icon" />
+                          <p>No playlists found.</p>
+                        </div>
+                      ) : playlists.map(playlist => (
+                        <div
+                          key={playlist.id}
                           className="playlist-item-card"
-                          onClick={() => playlist.isLocal ? navigate(`/library/saved/${playlist.id}`) : navigate('/library')}
+                          style={{ position: 'relative' }}
+                          onClick={() => {
+                            if (playlist.isLocal) {
+                              navigate(`/library/saved/${playlist.id}`);
+                            } else if (playlist.isDb) {
+                              navigate('/library');
+                            } else if (playlist.isLikedPlaylist) {
+                              navigate(`/playlist/${playlist.id}`);
+                            } else {
+                              navigate('/library');
+                            }
+                          }}
                         >
-                          <img src={playlist.cover} alt={playlist.name} />
+                          <div className="playlist-item-card__image-container" style={{ position: 'relative' }}>
+                            <img src={playlist.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80'} alt={playlist.name} />
+                            <button
+                              className="delete-playlist-btn"
+                              title="Delete Playlist"
+                              onClick={(e) => handleDeletePlaylist(e, playlist)}
+                              style={{
+                                position: 'absolute',
+                                top: '8px',
+                                right: '8px',
+                                background: 'rgba(0,0,0,0.65)',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '28px',
+                                height: '28px',
+                                color: '#ef4444',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 5
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                           <strong>{playlist.name}</strong>
-                          <span>{playlist.count} songs</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                            <span className="playlist-badge" style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', fontWeight: '600' }}>
+                              {playlist.type || 'Playlist'}
+                            </span>
+                            <span style={{ color: 'var(--text-muted, #94a3b8)', fontSize: '0.85rem' }}>
+                              {playlist.count || 0} songs
+                            </span>
+                          </div>
                         </div>
                       ))}
+
+                      {/* Create Playlist Grid Card */}
+                      <div className="playlist-item-card create-card" onClick={handleCreatePlaylist}>
+                        <div className="create-card__inner">
+                          <Plus size={36} className="plus-icon" />
+                          <strong>Create Playlist</strong>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -555,7 +936,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                         </thead>
                         <tbody>
                           {likedSongs.map((song, index) => (
-                            <tr key={song.id} onClick={() => onPlayTrack?.(song)}>
+                            <tr key={song.id || index} onClick={() => onPlayTrack?.(song)}>
                               <td>{index + 1}</td>
                               <td className="song-title-cell">
                                 <img src={song.thumbnail || song.cover} alt="" />
@@ -565,15 +946,40 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                                 </div>
                               </td>
                               <td>
-                                <button 
-                                  className="play-song-row-btn"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onQueueTrack?.(song);
-                                  }}
-                                >
-                                  Queue
-                                </button>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <button
+                                    className="play-song-row-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onQueueTrack?.(song);
+                                    }}
+                                  >
+                                    Queue
+                                  </button>
+                                  <button
+                                    className="remove-song-row-btn"
+                                    title="Remove from Liked Songs"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveLikedSong(song.song_id || song.id);
+                                    }}
+                                    style={{
+                                      background: 'rgba(239, 68, 68, 0.15)',
+                                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                                      borderRadius: '6px',
+                                      padding: '6px 10px',
+                                      color: '#f87171',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      fontSize: '0.8rem',
+                                      fontWeight: '600'
+                                    }}
+                                  >
+                                    <Trash2 size={13} /> Remove
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -583,9 +989,9 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                   </div>
                 )}
 
-                {activeTab === 'Following' && (
+                {activeTab === 'Artists' && (
                   <div className="tab-view__grid">
-                    <h2>Following</h2>
+                    <h2>Followed Artists</h2>
                     {followedArtists.length === 0 ? (
                       <div className="empty-tab-state">
                         <CheckCircle2 size={48} className="icon" />
@@ -594,16 +1000,16 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                     ) : (
                       <div className="playlists-grid-layout">
                         {followedArtists.map(artist => (
-                          <div 
-                            key={artist.id} 
+                          <div
+                            key={artist.id}
                             className="artist-circle-card"
-                            onClick={() => navigate(`/artist/${encodeURIComponent(artist.name)}`)}
+                            onClick={() => navigate(`/artists/${encodeURIComponent(artist.name)}`)}
                           >
                             <div className="artist-circle-card__image">
-                              <img src={artist.image} alt={artist.name} />
+                              <ProfileArtistAvatar artist={artist} />
                             </div>
                             <strong>{artist.name}</strong>
-                            <span>{artist.role}</span>
+                            <span>{getArtistRole(artist)}</span>
                           </div>
                         ))}
                       </div>
@@ -613,7 +1019,29 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
 
                 {activeTab === 'History' && (
                   <div className="tab-view__list">
-                    <h2>Listening History</h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <h2 style={{ margin: 0 }}>Listening History</h2>
+                      {historyItems.length > 0 && (
+                        <button
+                          onClick={handleClearHistory}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '6px',
+                            padding: '6px 12px',
+                            color: '#f87171',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Trash2 size={13} /> Clear History
+                        </button>
+                      )}
+                    </div>
                     {historyItems.length === 0 ? (
                       <div className="empty-tab-state">
                         <History size={48} className="icon" />
@@ -625,6 +1053,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                           <tr>
                             <th>Activity</th>
                             <th>Date</th>
+                            <th>Action</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -635,6 +1064,30 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                                 {item.subtitle && <span className="subtitle"> - {item.subtitle}</span>}
                               </td>
                               <td>{new Date(item.created_at || item.createdAt).toLocaleDateString()}</td>
+                              <td>
+                                <button
+                                  title="Delete Item"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteHistoryItem(item.id);
+                                  }}
+                                  style={{
+                                    background: 'rgba(239, 68, 68, 0.15)',
+                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                    borderRadius: '6px',
+                                    padding: '4px 8px',
+                                    color: '#f87171',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: '600'
+                                  }}
+                                >
+                                  <Trash2 size={12} /> Remove
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -643,31 +1096,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                   </div>
                 )}
 
-                {activeTab === 'Recently Played' && (
-                  <div className="tab-view__grid">
-                    <h2>Recently Played</h2>
-                    {recentlyPlayed.length === 0 ? (
-                      <div className="empty-tab-state">
-                        <Music size={48} className="icon" />
-                        <p>No recently played tracks.</p>
-                      </div>
-                    ) : (
-                      <div className="playlists-grid-layout">
-                        {recentlyPlayed.map((track, index) => (
-                          <div 
-                            key={`${track.id}-${index}`} 
-                            className="playlist-item-card"
-                            onClick={() => onPlayTrack?.(track)}
-                          >
-                            <img src={track.cover || track.thumbnail} alt={track.title} />
-                            <strong>{track.title}</strong>
-                            <span>{track.artist}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+
 
                 {activeTab === 'Downloads' && (
                   <div className="tab-view__list">
@@ -692,13 +1121,13 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
           <div className="premium-profile__banner">
             <div className="premium-profile__user-card">
               <div className="premium-profile__avatar-container">
-                <img 
-                  src={profile?.avatar || 'http://localhost:5000/uploads/profile_avatar.png'} 
-                  alt={profile?.name} 
-                  className="premium-profile__avatar-img" 
+                <img
+                  src={profile?.avatar || 'http://localhost:5000/uploads/profile_avatar.png'}
+                  alt={profile?.name}
+                  className="premium-profile__avatar-img"
                 />
-                <button 
-                  className="premium-profile__avatar-edit-btn" 
+                <button
+                  className="premium-profile__avatar-edit-btn"
                   onClick={() => setShowEditModal(true)}
                   title="Edit Profile"
                 >
@@ -712,8 +1141,8 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                 <p className="premium-profile__user-bio">
                   {profile?.bio || '“Music is the soundtrack of my life.”'}
                 </p>
-                <button 
-                  className="premium-profile__edit-profile-btn" 
+                <button
+                  className="premium-profile__edit-profile-btn"
                   onClick={() => setShowEditModal(true)}
                 >
                   <PenTool size={14} style={{ marginRight: '6px' }} />
@@ -763,11 +1192,17 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
           {/* Tabs Navigation */}
           <div className="premium-profile__tabs-container">
             <div className="premium-profile__tabs">
-              {['Overview', 'Playlists', 'Liked Songs', 'Following', 'Recently Played', 'Downloads', 'History'].map(tab => (
-                <button 
+              {['Playlists', 'Liked Songs', 'Artists', 'Downloads', 'History'].map(tab => (
+                <button
                   key={tab}
-                  className={activeTab === tab ? 'active' : ''} 
-                  onClick={() => setActiveTab(tab)}
+                  className={activeTab === tab ? 'active' : ''}
+                  onClick={() => {
+                    if (tab === 'History') {
+                      navigate('/history');
+                    } else {
+                      setActiveTab(tab);
+                    }
+                  }}
                 >
                   {tab}
                 </button>
@@ -777,98 +1212,93 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
 
           {/* Main Tab Content */}
           <div className="premium-profile__content">
-            
-            {/* --- OVERVIEW TAB --- */}
-            {activeTab === 'Overview' && (
-              <div className="overview-subview">
-                
-                {/* Playlists Section */}
-                <div className="overview-section">
-                  <div className="overview-section__header">
-                    <h2>Your Playlists</h2>
-                    <button className="see-all-btn" onClick={() => setActiveTab('Playlists')}>See All</button>
-                  </div>
-
-                  <div className="playlists-horizontal-grid">
-                    {(playlists.length > 0 ? playlists : DEFAULT_PLAYLISTS).slice(0, 5).map(playlist => (
-                      <div 
-                        key={playlist.id} 
-                        className="playlist-item-card"
-                        onClick={() => playlist.isLocal ? navigate(`/library/saved/${playlist.id}`) : navigate('/library')}
-                      >
-                        <div className="playlist-item-card__image-container">
-                          <img src={playlist.cover} alt={playlist.name} />
-                          <div className="play-hover-overlay">
-                            <div className="play-icon-circle">
-                              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                <path d="M8 5v14l11-7z"/>
-                              </svg>
-                            </div>
-                          </div>
-                        </div>
-                        <strong>{playlist.name}</strong>
-                        <span>{playlist.count} songs</span>
-                      </div>
-                    ))}
-                    
-                    {/* Create Playlist Grid Card */}
-                    <div className="playlist-item-card create-card" onClick={handleCreatePlaylist}>
-                      <div className="create-card__inner">
-                        <Plus size={36} className="plus-icon" />
-                        <strong>Create Playlist</strong>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Followed Artists Section */}
-                <div className="overview-section" style={{ marginTop: '40px' }}>
-                  <div className="overview-section__header">
-                    <h2>Artists, Actors & Singers You Follow</h2>
-                    <button className="see-all-btn" onClick={() => setActiveTab('Following')}>See All</button>
-                  </div>
-
-                  <div className="artists-horizontal-grid">
-                    {(followedArtists.length > 0 ? followedArtists : DEFAULT_ARTISTS).slice(0, 7).map(artist => (
-                      <div 
-                        key={artist.id} 
-                        className="artist-circle-card"
-                        onClick={() => navigate(`/artist/${encodeURIComponent(artist.name)}`)}
-                      >
-                        <div className="artist-circle-card__image">
-                          <img src={artist.image} alt={artist.name} />
-                        </div>
-                        <strong>{artist.name}</strong>
-                        <span>{artist.role}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* --- PLAYLISTS TAB --- */}
             {activeTab === 'Playlists' && (
               <div className="tab-view__grid">
                 <div className="tab-view__grid-header">
-                  <h2>Your Playlists</h2>
+                  <div>
+                    <h2>Your Saved & Liked Playlists</h2>
+                    <p style={{ color: 'var(--text-muted, #94a3b8)', fontSize: '0.88rem', marginTop: '4px' }}>
+                      All playlists created, saved, or liked across your library
+                    </p>
+                  </div>
                   <button className="premium-profile__btn-glow" onClick={handleCreatePlaylist}>
                     <Plus size={16} /> Create Playlist
                   </button>
                 </div>
-                
+
                 <div className="playlists-grid-layout">
-                  {(playlists.length > 0 ? playlists : DEFAULT_PLAYLISTS).map(playlist => (
-                    <div 
-                      key={playlist.id} 
+                  {playlists.length === 0 ? (
+                    <div className="empty-tab-state" style={{ gridColumn: '1 / -1' }}>
+                      <Music size={48} className="icon" />
+                      <p>No playlists found.</p>
+                    </div>
+                  ) : playlists.map(playlist => (
+                    <div
+                      key={playlist.id}
                       className="playlist-item-card"
-                      onClick={() => playlist.isLocal ? navigate(`/library/saved/${playlist.id}`) : navigate('/library')}
+                      style={{ position: 'relative' }}
+                      onClick={() => {
+                        if (playlist.isLocal) {
+                          navigate(`/library/saved/${playlist.id}`);
+                        } else if (playlist.isDb) {
+                          navigate('/library');
+                        } else if (playlist.isLikedPlaylist) {
+                          navigate(`/playlist/${playlist.id}`);
+                        } else {
+                          navigate('/library');
+                        }
+                      }}
                     >
-                      <img src={playlist.cover} alt={playlist.name} />
+                      <div className="playlist-item-card__image-container" style={{ position: 'relative' }}>
+                        <img
+                          src={playlist.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80'}
+                          alt={playlist.name}
+                        />
+                        <button
+                          className="delete-playlist-btn"
+                          title="Delete Playlist"
+                          onClick={(e) => handleDeletePlaylist(e, playlist)}
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: 'rgba(0,0,0,0.65)',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '28px',
+                            height: '28px',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 5
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                       <strong>{playlist.name}</strong>
-                      <span>{playlist.count} songs</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                        <span className="playlist-badge" style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', fontWeight: '600' }}>
+                          {playlist.type || 'Playlist'}
+                        </span>
+                        <span style={{ color: 'var(--text-muted, #94a3b8)', fontSize: '0.85rem' }}>
+                          {playlist.count || 0} songs
+                        </span>
+                      </div>
                     </div>
                   ))}
+
+                  {/* Create Playlist Grid Card */}
+                  <div className="playlist-item-card create-card" onClick={handleCreatePlaylist}>
+                    <div className="create-card__inner">
+                      <Plus size={36} className="plus-icon" />
+                      <strong>Create Playlist</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -895,7 +1325,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                     </thead>
                     <tbody>
                       {likedSongs.map((song, index) => (
-                        <tr key={song.id} onClick={() => onPlayTrack?.(song)}>
+                        <tr key={song.id || index} onClick={() => onPlayTrack?.(song)}>
                           <td>{index + 1}</td>
                           <td className="song-title-cell">
                             <img src={song.thumbnail || song.cover} alt="" />
@@ -906,15 +1336,40 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                           </td>
                           <td>{song.album || '—'}</td>
                           <td>
-                            <button 
-                              className="play-song-row-btn"
-                              onClick={(e) => {
-                                    e.stopPropagation();
-                                    onQueueTrack?.(song);
-                              }}
-                            >
-                              Add to Queue
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <button
+                                className="play-song-row-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onQueueTrack?.(song);
+                                }}
+                              >
+                                Add to Queue
+                              </button>
+                              <button
+                                className="remove-song-row-btn"
+                                title="Remove from Liked Songs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveLikedSong(song.song_id || song.id);
+                                }}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  borderRadius: '6px',
+                                  padding: '6px 12px',
+                                  color: '#f87171',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  fontSize: '0.82rem',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                <Trash2 size={14} /> Remove
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -924,10 +1379,10 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
               </div>
             )}
 
-            {/* --- FOLLOWING TAB --- */}
-            {activeTab === 'Following' && (
+            {/* --- ARTISTS TAB --- */}
+            {activeTab === 'Artists' && (
               <div className="tab-view__grid">
-                <h2>Following</h2>
+                <h2>Followed Artists</h2>
                 {followedArtists.length === 0 ? (
                   <div className="empty-tab-state">
                     <CheckCircle2 size={48} className="icon" />
@@ -937,16 +1392,16 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                 ) : (
                   <div className="playlists-grid-layout">
                     {followedArtists.map(artist => (
-                      <div 
-                        key={artist.id} 
+                      <div
+                        key={artist.id}
                         className="artist-circle-card"
-                        onClick={() => navigate(`/artist/${encodeURIComponent(artist.name)}`)}
+                        onClick={() => navigate(`/artists/${encodeURIComponent(artist.name)}`)}
                       >
                         <div className="artist-circle-card__image">
-                          <img src={artist.image} alt={artist.name} />
+                          <ProfileArtistAvatar artist={artist} />
                         </div>
                         <strong>{artist.name}</strong>
-                        <span>{artist.role}</span>
+                        <span>{getArtistRole(artist)}</span>
                       </div>
                     ))}
                   </div>
@@ -954,32 +1409,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
               </div>
             )}
 
-            {/* --- RECENTLY PLAYED TAB --- */}
-            {activeTab === 'Recently Played' && (
-              <div className="tab-view__grid">
-                <h2>Recently Played</h2>
-                {recentlyPlayed.length === 0 ? (
-                  <div className="empty-tab-state">
-                    <Music size={48} className="icon" />
-                    <p>No recently played tracks found.</p>
-                  </div>
-                ) : (
-                  <div className="playlists-grid-layout">
-                    {recentlyPlayed.map((track, index) => (
-                      <div 
-                        key={`${track.id}-${index}`} 
-                        className="playlist-item-card"
-                        onClick={() => onPlayTrack?.(track)}
-                      >
-                        <img src={track.cover || track.thumbnail} alt={track.title} />
-                        <strong>{track.title}</strong>
-                        <span>{track.artist}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+
 
             {/* --- DOWNLOADS TAB --- */}
             {activeTab === 'Downloads' && (
@@ -996,7 +1426,29 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
             {/* --- HISTORY TAB --- */}
             {activeTab === 'History' && (
               <div className="tab-view__list">
-                <h2>Listening History</h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h2 style={{ margin: 0 }}>Listening History</h2>
+                  {historyItems.length === 0 ? null : (
+                    <button
+                      onClick={handleClearHistory}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        borderRadius: '6px',
+                        padding: '6px 14px',
+                        color: '#f87171',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Trash2 size={14} /> Clear History
+                    </button>
+                  )}
+                </div>
                 {historyItems.length === 0 ? (
                   <div className="empty-tab-state">
                     <History size={48} className="icon" />
@@ -1009,6 +1461,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                         <th>Type</th>
                         <th>Activity</th>
                         <th>Date</th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1022,6 +1475,31 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                             {item.subtitle && <span className="subtitle"> - {item.subtitle}</span>}
                           </td>
                           <td>{new Date(item.created_at || item.createdAt).toLocaleString()}</td>
+                          <td>
+                            <button
+                              className="remove-song-row-btn"
+                              title="Delete Item"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteHistoryItem(item.id);
+                              }}
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.15)',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                borderRadius: '6px',
+                                padding: '5px 10px',
+                                color: '#f87171',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.78rem',
+                                fontWeight: '600'
+                              }}
+                            >
+                              <Trash2 size={13} /> Remove
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1057,25 +1535,25 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
               <div className="form-group avatar-selector-group">
                 <label>Profile Picture</label>
                 <div className="avatar-preview-wrapper">
-                  <img 
-                    src={editForm.avatar || 'http://localhost:5000/uploads/profile_avatar.png'} 
-                    alt="Preview" 
-                    className="avatar-preview" 
+                  <img
+                    src={editForm.avatar || 'http://localhost:5000/uploads/profile_avatar.png'}
+                    alt="Preview"
+                    className="avatar-preview"
                   />
                   <div className="avatar-actions">
                     <button type="button" className="upload-btn" onClick={() => fileInputRef.current?.click()}>
                       Upload Picture
                     </button>
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      onChange={handleFileChange} 
-                      accept="image/*" 
-                      style={{ display: 'none' }} 
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      accept="image/*"
+                      style={{ display: 'none' }}
                     />
-                    <button 
-                      type="button" 
-                      className="reset-btn" 
+                    <button
+                      type="button"
+                      className="reset-btn"
                       onClick={() => setEditForm(prev => ({ ...prev, avatar: '' }))}
                     >
                       Clear
@@ -1086,10 +1564,10 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                 <div className="preset-avatars-label">Or choose a preset avatar:</div>
                 <div className="preset-avatars-grid">
                   {PRESET_AVATARS.map((preset, idx) => (
-                    <img 
-                      key={idx} 
-                      src={preset} 
-                      alt="" 
+                    <img
+                      key={idx}
+                      src={preset}
+                      alt=""
                       className={`preset-avatar-option ${editForm.avatar === preset ? 'selected' : ''}`}
                       onClick={() => setEditForm(prev => ({ ...prev, avatar: preset }))}
                     />
@@ -1099,30 +1577,30 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
 
               <div className="form-group">
                 <label htmlFor="name-input">Display Name</label>
-                <input 
+                <input
                   id="name-input"
-                  type="text" 
-                  value={editForm.name} 
+                  type="text"
+                  value={editForm.name}
                   onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                  required 
+                  required
                 />
               </div>
 
               <div className="form-group">
                 <label htmlFor="bio-input">Bio / Quote</label>
-                <textarea 
+                <textarea
                   id="bio-input"
-                  rows="2" 
-                  value={editForm.bio} 
+                  rows="2"
+                  value={editForm.bio}
                   onChange={e => setEditForm(prev => ({ ...prev, bio: e.target.value }))}
                 />
               </div>
 
               <div className="form-group">
                 <label htmlFor="plan-select">Subscription Plan</label>
-                <select 
+                <select
                   id="plan-select"
-                  value={editForm.plan} 
+                  value={editForm.plan}
                   onChange={e => setEditForm(prev => ({ ...prev, plan: e.target.value }))}
                 >
                   <option value="Free Plan">Free Plan</option>
@@ -1159,34 +1637,34 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
 
               <div className="form-group">
                 <label htmlFor="old-password">Current Password</label>
-                <input 
+                <input
                   id="old-password"
-                  type="password" 
-                  value={passwordForm.oldPassword} 
+                  type="password"
+                  value={passwordForm.oldPassword}
                   onChange={e => setPasswordForm(prev => ({ ...prev, oldPassword: e.target.value }))}
-                  required 
+                  required
                 />
               </div>
 
               <div className="form-group">
                 <label htmlFor="new-password">New Password</label>
-                <input 
+                <input
                   id="new-password"
-                  type="password" 
-                  value={passwordForm.newPassword} 
+                  type="password"
+                  value={passwordForm.newPassword}
                   onChange={e => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                  required 
+                  required
                 />
               </div>
 
               <div className="form-group">
                 <label htmlFor="confirm-password">Confirm New Password</label>
-                <input 
+                <input
                   id="confirm-password"
-                  type="password" 
-                  value={passwordForm.confirmPassword} 
+                  type="password"
+                  value={passwordForm.confirmPassword}
                   onChange={e => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                  required 
+                  required
                 />
               </div>
 
@@ -1217,7 +1695,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
 
               <h3>Upgrade Plan</h3>
               <div className="sub-plans-list">
-                <div 
+                <div
                   className={`sub-plan-option ${editForm.plan === 'Premium Individual' ? 'active' : ''}`}
                   onClick={() => {
                     setEditForm(prev => ({ ...prev, plan: 'Premium Individual' }));
@@ -1231,7 +1709,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                   <span className="price">$9.99 / mo</span>
                 </div>
 
-                <div 
+                <div
                   className={`sub-plan-option ${editForm.plan === 'Premium Duo' ? 'active' : ''}`}
                   onClick={() => {
                     setEditForm(prev => ({ ...prev, plan: 'Premium Duo' }));
@@ -1245,7 +1723,7 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
                   <span className="price">$14.99 / mo</span>
                 </div>
 
-                <div 
+                <div
                   className={`sub-plan-option ${editForm.plan === 'Premium Family' ? 'active' : ''}`}
                   onClick={() => {
                     setEditForm(prev => ({ ...prev, plan: 'Premium Family' }));
@@ -1315,53 +1793,53 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
               <form onSubmit={handlePaymentSubmit} className="profile-modal__form payment-form">
                 <div className="form-group">
                   <label htmlFor="cardholder-input">Cardholder Name</label>
-                  <input 
+                  <input
                     id="cardholder-input"
-                    type="text" 
+                    type="text"
                     placeholder="e.g. Prajwal S A"
-                    value={paymentForm.cardholder} 
+                    value={paymentForm.cardholder}
                     onChange={e => setPaymentForm(prev => ({ ...prev, cardholder: e.target.value }))}
-                    required 
+                    required
                   />
                 </div>
 
                 <div className="form-group">
                   <label htmlFor="cardnumber-input">Card Number</label>
-                  <input 
+                  <input
                     id="cardnumber-input"
-                    type="text" 
+                    type="text"
                     placeholder="1234 5678 9876 5432"
-                    value={paymentForm.cardNumber} 
+                    value={paymentForm.cardNumber}
                     onChange={e => setPaymentForm(prev => ({ ...prev, cardNumber: e.target.value }))}
                     maxLength="19"
-                    required 
+                    required
                   />
                 </div>
 
                 <div className="form-row" style={{ display: 'flex', gap: '16px' }}>
                   <div className="form-group" style={{ flex: 1 }}>
                     <label htmlFor="expiry-input">Expiry Date</label>
-                    <input 
+                    <input
                       id="expiry-input"
-                      type="text" 
+                      type="text"
                       placeholder="MM/YY"
-                      value={paymentForm.expiry} 
+                      value={paymentForm.expiry}
                       onChange={e => setPaymentForm(prev => ({ ...prev, expiry: e.target.value }))}
                       maxLength="5"
-                      required 
+                      required
                     />
                   </div>
 
                   <div className="form-group" style={{ flex: 1 }}>
                     <label htmlFor="cvv-input">CVV</label>
-                    <input 
+                    <input
                       id="cvv-input"
-                      type="password" 
+                      type="password"
                       placeholder="***"
-                      value={paymentForm.cvv} 
+                      value={paymentForm.cvv}
                       onChange={e => setPaymentForm(prev => ({ ...prev, cvv: e.target.value }))}
                       maxLength="3"
-                      required 
+                      required
                     />
                   </div>
                 </div>
@@ -1387,37 +1865,37 @@ function ProfilePage({ user, token, onLogout, onUserUpdate, refreshSignal, onPla
             </div>
 
             <div className="mobile-settings-list">
-              <button 
+              <button
                 type="button"
-                className="mobile-settings-item" 
+                className="mobile-settings-item"
                 onClick={() => { setShowSettingsDrawer(false); setShowEditModal(true); }}
               >
                 <User size={18} style={{ marginRight: '8px' }} /> Edit Profile
               </button>
-              <button 
+              <button
                 type="button"
-                className="mobile-settings-item" 
+                className="mobile-settings-item"
                 onClick={() => { setShowSettingsDrawer(false); setShowPasswordModal(true); }}
               >
                 <Lock size={18} style={{ marginRight: '8px' }} /> Change Password
               </button>
-              <button 
+              <button
                 type="button"
-                className="mobile-settings-item" 
+                className="mobile-settings-item"
                 onClick={() => { setShowSettingsDrawer(false); setShowSubModal(true); }}
               >
                 <Award size={18} style={{ marginRight: '8px' }} /> Subscription Plan
               </button>
-              <button 
+              <button
                 type="button"
-                className="mobile-settings-item" 
+                className="mobile-settings-item"
                 onClick={() => { setShowSettingsDrawer(false); setShowPaymentModal(true); }}
               >
                 <CreditCard size={18} style={{ marginRight: '8px' }} /> Payment Methods
               </button>
-              <button 
+              <button
                 type="button"
-                className="mobile-settings-item logout" 
+                className="mobile-settings-item logout"
                 onClick={() => { setShowSettingsDrawer(false); onLogout(); }}
               >
                 <LogOut size={18} style={{ marginRight: '8px' }} /> Log Out
