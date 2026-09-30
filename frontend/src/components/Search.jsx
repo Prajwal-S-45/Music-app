@@ -25,6 +25,18 @@ function Search({ token, activeTrackId, onPlayTrack, onQueueTrack, onLikeUpdate,
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [searchType, setSearchType] = useState('song');
   const [results, setResults] = useState([]);
+  const [groupedPayload, setGroupedPayload] = useState({
+    query: '',
+    topResults: [],
+    songs: [],
+    albums: [],
+    artists: [],
+    playlists: [],
+    podcasts: [],
+    movies: [],
+  });
+  const [trendingQueries, setTrendingQueries] = useState([]);
+  const [popularArtists, setPopularArtists] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [likedSongIds, setLikedSongIds] = useState([]);
@@ -33,6 +45,18 @@ function Search({ token, activeTrackId, onPlayTrack, onQueueTrack, onLikeUpdate,
   const [status, setStatus] = useState('');
   const [recentSearches, setRecentSearches] = useState([]);
   const [triggerImmediateSearch, setTriggerImmediateSearch] = useState(0);
+
+  // Fetch search suggestions on mount
+  useEffect(() => {
+    apiClient.get('/api/search/suggestions')
+      .then((res) => {
+        if (res.data?.success && res.data?.data) {
+          setTrendingQueries(res.data.data.trending || []);
+          setPopularArtists(res.data.data.popularArtists || []);
+        }
+      })
+      .catch((err) => console.error('Failed to load search suggestions:', err));
+  }, []);
 
   const lastRequestKeyRef = useRef('');
 
@@ -155,11 +179,16 @@ function Search({ token, activeTrackId, onPlayTrack, onQueueTrack, onLikeUpdate,
       setErrorMessage('');
       setWarningMessage('');
 
+      const savedLangs = localStorage.getItem('music_pref_languages');
+      const languages = savedLangs ? JSON.parse(savedLangs) : [];
+      const primaryLanguage = languages[0] || 'Hindi';
+
       const response = await apiClient.get('/api/search', {
         params: {
           q: trimmed,
           type: normalizedType,
           limit: 10,
+          language: primaryLanguage,
         },
       });
 
@@ -170,21 +199,19 @@ function Search({ token, activeTrackId, onPlayTrack, onQueueTrack, onLikeUpdate,
           : [];
 
       const nextResults = rawResults.map((song) => {
-        const isJioSaavn = song.source === 'jiosaavn' || song.source === 'mock-fallback' || song.file_url;
-        const trackId = song.id || song.videoId;
+        const trackId = song.id;
         return {
           ...song,
           id: trackId,
-          videoId: isJioSaavn ? null : (song.videoId || trackId),
           title: song.title || 'Untitled Track',
-          artist: song.artist || song.channelTitle || 'Unknown Channel',
+          artist: song.artist || 'Unknown Artist',
           album: song.album || null,
           cover: song.cover || song.thumbnail || song.image || FALLBACK_IMAGE,
           thumbnail: song.cover || song.thumbnail || song.image || FALLBACK_IMAGE,
           duration: Number(song.duration) || 0,
           source: song.source || 'jiosaavn',
           file_url: song.file_url || '',
-          streamUrl: isJioSaavn ? (song.file_url || song.streamUrl || '') : null,
+          streamUrl: song.file_url || song.streamUrl || '',
           playable: Boolean(trackId),
         };
       });
@@ -328,7 +355,7 @@ function Search({ token, activeTrackId, onPlayTrack, onQueueTrack, onLikeUpdate,
   const groupedResults = useMemo(() => {
     // Filter and prioritize songs by relevance
     const playableSongs = results.filter((song) => song.playable);
-    
+
     // Sort by relevance: exact title match > title contains > artist match
     const sortedSongs = [...playableSongs].sort((a, b) => {
       const aTitle = a.title?.toLowerCase() || '';
@@ -436,7 +463,7 @@ function Search({ token, activeTrackId, onPlayTrack, onQueueTrack, onLikeUpdate,
       <div className="search-page-shell__glow search-page-shell__glow--left" />
       <div className="search-page-shell__glow search-page-shell__glow--right" />
 
-      <div className="search-page-shell__content mx-auto w-full max-w-7xl pb-24 pt-20 px-4 md:px-8 md:pb-10 md:pt-28">
+      <div className="search-page-shell__content mx-auto w-full max-w-7xl pb-24 pt-6 px-4 md:px-8 md:pb-10 md:pt-8">
 
         <AnimatePresence mode="wait">
           <motion.div
