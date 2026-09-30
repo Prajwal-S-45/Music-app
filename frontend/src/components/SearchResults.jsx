@@ -1,6 +1,7 @@
-import { memo, useMemo, useState, useEffect } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Disc3, Heart, Mic2, Play, Search as SearchIcon, Sparkles, TrendingUp, Radio, MoreHorizontal, ListPlus } from 'lucide-react';
+import { Disc3, Heart, Mic2, Play, Search as SearchIcon, TrendingUp, Radio, MoreHorizontal, ListPlus, Sparkles, ChevronRight } from 'lucide-react';
 import apiClient from '../api/client';
 
 const sectionVariants = {
@@ -16,15 +17,15 @@ export const formatDuration = (seconds) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-function SuggestionsSection({ recentSearches = [], onSearch }) {
+function SuggestionsSection({ recentSearches = [], trendingQueries = [], popularArtists = [], onSearch }) {
   const recent = recentSearches.length ? recentSearches.slice(0, 6) : ['Kesariya', 'Tum Hi Ho', 'Arijit Singh'];
-  const TRENDING_SONGS = ['Saiyaara', 'Aaj Ki Raat', 'Finding Her', 'Kesariya'];
-  const POPULAR_ARTISTS = ['Arijit Singh', 'Pritam', 'Shreya Ghoshal', 'Amit Trivedi'];
+  const trending = trendingQueries.length ? trendingQueries.slice(0, 6) : ['Saiyaara', 'Aaj Ki Raat', 'Finding Her', 'Kesariya'];
+  const artists = popularArtists.length ? popularArtists.slice(0, 6) : ['Arijit Singh', 'Pritam', 'Shreya Ghoshal', 'Amit Trivedi'];
 
   const groups = [
     { title: 'Recent Searches', icon: SearchIcon, items: recent },
-    { title: 'Trending Now', icon: TrendingUp, items: TRENDING_SONGS },
-    { title: 'Popular Artists', icon: Mic2, items: POPULAR_ARTISTS },
+    { title: 'Trending Now', icon: TrendingUp, items: trending },
+    { title: 'Popular Artists', icon: Mic2, items: artists },
   ];
 
   return (
@@ -60,7 +61,7 @@ function SuggestionsSection({ recentSearches = [], onSearch }) {
 function PremiumSongRow({ song, isActive, onPlayTrack, onLikeTrack, onQueueTrack, isLiked }) {
   const playCount = useMemo(() => {
     return Math.floor(Math.random() * 900 + 100) + 'M';
-  }, [song.id, song.videoId, song.title]);
+  }, [song.id, song.title]);
 
   return (
     <motion.article
@@ -79,24 +80,24 @@ function PremiumSongRow({ song, isActive, onPlayTrack, onLikeTrack, onQueueTrack
           <span className="premium-song-row__artist">{song.artist}</span>
         </div>
       </div>
-      
+
       <div className="premium-song-row__album">
         {song.album || 'Single'}
       </div>
-      
+
       <div className="premium-song-row__stats">
         <span className="premium-song-row__plays">{playCount}</span>
         <span className="premium-song-row__duration">{formatDuration(song.duration)}</span>
       </div>
-      
+
       <div className="premium-song-row__actions">
-        <button 
+        <button
           className={`premium-song-row__like ${isLiked ? 'liked' : ''}`}
           onClick={(e) => { e.stopPropagation(); onLikeTrack?.(song); }}
         >
           <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
         </button>
-        <button 
+        <button
           className="premium-song-row__queue"
           onClick={(e) => { e.stopPropagation(); onQueueTrack?.(song); }}
         >
@@ -110,12 +111,18 @@ function PremiumSongRow({ song, isActive, onPlayTrack, onLikeTrack, onQueueTrack
   );
 }
 
-function ArtistCard({ item, onActivate }) {
-  const [imageUrl, setImageUrl] = useState(item.image);
+function ArtistCard({ item }) {
+  const [imageUrl, setImageUrl] = useState(
+    item.image && !item.image.includes('unsplash.com')
+      ? item.image
+      : (item.photo && !item.photo.includes('unsplash.com') ? item.photo : null)
+  );
+  const navigate = useNavigate();
 
   useEffect(() => {
+    if (imageUrl && !imageUrl.includes('unsplash.com')) return;
     let isMounted = true;
-    
+
     apiClient.get(`/api/music/artist-image?name=${encodeURIComponent(item.title)}`)
       .then(res => {
         if (isMounted && res.data && res.data.url) {
@@ -127,7 +134,11 @@ function ArtistCard({ item, onActivate }) {
     return () => {
       isMounted = false;
     };
-  }, [item.title]);
+  }, [item.title, imageUrl]);
+
+  const handleClick = () => {
+    navigate(`/artists/${encodeURIComponent(item.title)}`);
+  };
 
   return (
     <motion.button
@@ -135,7 +146,7 @@ function ArtistCard({ item, onActivate }) {
       whileHover={{ y: -4, scale: 1.025 }}
       whileTap={{ scale: 0.98 }}
       className="search-artist-card group"
-      onClick={() => onActivate?.({ query: item.title, type: 'artist' })}
+      onClick={handleClick}
     >
       <img src={imageUrl} alt={item.title} loading="lazy" />
       <span>{item.title}</span>
@@ -146,13 +157,24 @@ function ArtistCard({ item, onActivate }) {
 
 function CollectionCard({ item, type, onActivate }) {
   const Icon = type === 'podcast' ? Radio : type === 'playlist' ? Sparkles : Disc3;
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    if (type === 'album') {
+      const artist = item.subtitle || item.meta || 'Unknown';
+      navigate(`/album/${encodeURIComponent(artist)}/${encodeURIComponent(item.title)}${item.id ? `?id=${encodeURIComponent(item.id)}` : ''}`);
+    } else {
+      onActivate?.({ query: item.title, type });
+    }
+  };
+
   return (
     <motion.button
       type="button"
       whileHover={{ y: -4, scale: 1.025 }}
       whileTap={{ scale: 0.98 }}
       className="search-collection-card group"
-      onClick={() => onActivate?.({ query: item.title, type: type === 'album' ? 'album' : 'song' })}
+      onClick={handleClick}
     >
       <div className="search-collection-card__image">
         <img src={item.image} alt={item.title} loading="lazy" />
@@ -190,121 +212,145 @@ function SearchResults({
   groupedResults,
   likedSongIds,
   recentSearches,
+  trendingQueries = [],
+  popularArtists = [],
   onPlayTrack,
   onQueueTrack,
   onLikeTrack,
   onCollectionActivate,
 }) {
-  
+  const navigate = useNavigate();
   const songs = groupedResults.songs || [];
   const albums = groupedResults.albums || [];
   const artists = groupedResults.artists || [];
-  const playlists = groupedResults.playlists || [];
+  if (!query) {
+    return (
+      <SuggestionsSection
+        recentSearches={recentSearches}
+        trendingQueries={trendingQueries}
+        popularArtists={popularArtists}
+        onSearch={onCollectionActivate}
+      />
+    );
+  }
 
-  const syntheticPlaylists = useMemo(() => {
-    if (playlists.length) return playlists;
-    return songs.slice(0, 20).map((song, index) => ({
-      id: `playlist-${song.id}-${index}`,
-      title: index % 2 === 0 ? `${song.title} Hits` : `${song.artist} Mix`,
-      subtitle: 'Playlist',
-      image: song.cover,
-      meta: 'Playlist',
-    }));
-  }, [playlists, songs]);
-  
-  const podcastsData = songs.slice(0, 20).map(s => ({...s, meta: 'Podcast Episode', title: `${s.artist} Interviews`}));
-
-  const tabs = ['Playlists', 'Songs', 'Albums', 'Podcasts', 'Artists'];
-  
-  const [activeTab, setActiveTab] = useState('Songs');
-  
-  // Set default tab based on what's available
-  useEffect(() => {
-    if (songs.length > 0) setActiveTab('Songs');
-    else if (albums.length > 0) setActiveTab('Albums');
-    else if (artists.length > 0) setActiveTab('Artists');
-    else if (playlists.length > 0) setActiveTab('Playlists');
-  }, [songs, albums, artists, playlists, query]);
-
-  if (!query) return <SuggestionsSection recentSearches={recentSearches} onSearch={onCollectionActivate} />;
   if (isLoading) return <LoadingSkeleton />;
-  if (errorMessage) return (
-    <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="search-empty-state search-empty-state--error">
-      <SearchIcon size={24} />
-      <h2>Search unavailable</h2>
-      <p>{errorMessage}</p>
-    </motion.section>
-  );
-  if (searched && !hasAnyResults) return (
-    <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="search-empty-state">
-      <SearchIcon size={24} />
-      <h2>No results found</h2>
-      <p>{warningMessage || 'Try another song, artist, album, or playlist.'}</p>
-    </motion.section>
-  );
 
-  const totalResults = songs.length + albums.length + artists.length + syntheticPlaylists.length;
+  if (errorMessage) {
+    return (
+      <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="search-empty-state search-empty-state--error">
+        <SearchIcon size={24} />
+        <h2>Search unavailable</h2>
+        <p>{errorMessage}</p>
+      </motion.section>
+    );
+  }
+
+  if (searched && !hasAnyResults) {
+    return (
+      <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="search-empty-state">
+        <SearchIcon size={24} />
+        <h2>No results found</h2>
+        <p>{warningMessage || 'Try another song, artist, album, or playlist.'}</p>
+      </motion.section>
+    );
+  }
 
   return (
     <div className="search-tab-interface">
-      {/* Search Header */}
-      <div className="search-tab-header">
-        <span className="search-tab-count">{totalResults} results</span>
-      </div>
-
-      {/* Tabs */}
-      <nav className="search-tabs-nav">
-        {tabs.map(tab => (
-          <button 
-            key={tab} 
-            className={`search-tab-btn ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab}
-          </button>
-        ))}
-      </nav>
-
-      <motion.div 
-        key={activeTab} 
-        initial="hidden" 
-        animate="visible" 
-        variants={sectionVariants} 
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={sectionVariants}
         className="search-stream-sections"
       >
-        
-        {activeTab === 'Songs' && (
-          <div className="search-song-list-vertical">
-            {songs.map(song => (
-              <PremiumSongRow key={song.id} song={song} isActive={activeTrackId === song.id} onPlayTrack={onPlayTrack} onLikeTrack={onLikeTrack} onQueueTrack={onQueueTrack} isLiked={likedSongIds?.includes(song.id)} />
-            ))}
-          </div>
+        <div className="search-results-feature-grid">
+          <section className="search-section">
+            <div className="search-section-header">
+              <h2>Top Songs</h2>
+              <button
+                type="button"
+                className="search-view-all-link"
+                onClick={() => navigate(`/search/songs?q=${encodeURIComponent(query)}`)}
+              >
+                View All <ChevronRight size={14} />
+              </button>
+            </div>
+            <div className="search-song-list-vertical">
+              {songs.slice(0, 4).map((song) => (
+                <PremiumSongRow
+                  key={song.id}
+                  song={song}
+                  isActive={activeTrackId === song.id}
+                  onPlayTrack={onPlayTrack}
+                  onLikeTrack={onLikeTrack}
+                  onQueueTrack={onQueueTrack}
+                  isLiked={likedSongIds?.includes(song.id)}
+                />
+              ))}
+              {songs.length === 0 && (
+                <div className="text-slate-400 text-sm py-4">No songs available</div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* Albums Preview Section */}
+        {albums.length > 0 && (
+          <section className="search-section mt-8">
+            <div className="search-section-header flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-white">Albums</h2>
+              <button
+                type="button"
+                className="search-view-all-link text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1"
+                onClick={() => navigate(`/search/albums?q=${encodeURIComponent(query)}`)}
+              >
+                View All <ChevronRight size={14} />
+              </button>
+            </div>
+            <div className="search-results-grid">
+              {albums.slice(0, 5).map((item) => (
+                <CollectionCard
+                  key={item.id}
+                  item={{
+                    ...item,
+                    image: item.cover,
+                    subtitle: item.composer,
+                  }}
+                  type="album"
+                />
+              ))}
+            </div>
+          </section>
         )}
 
-        {activeTab === 'Artists' && (
-          <div className="search-results-grid">
-            {artists.map(item => <ArtistCard key={item.id} item={item} onActivate={onCollectionActivate} />)}
-          </div>
+        {/* Artists Preview Section */}
+        {artists.length > 0 && (
+          <section className="search-section mt-8">
+            <div className="search-section-header flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-white">Artists</h2>
+              <button
+                type="button"
+                className="search-view-all-link text-xs font-semibold text-emerald-400 hover:underline flex items-center gap-1"
+                onClick={() => navigate(`/search/artists?q=${encodeURIComponent(query)}`)}
+              >
+                View All <ChevronRight size={14} />
+              </button>
+            </div>
+            <div className="search-results-grid">
+              {artists.slice(0, 5).map((item) => (
+                <ArtistCard
+                  key={item.id}
+                  item={{
+                    ...item,
+                    title: item.name,
+                    meta: item.profession,
+                  }}
+                />
+              ))}
+            </div>
+          </section>
         )}
-
-        {activeTab === 'Albums' && (
-          <div className="search-results-grid">
-            {albums.map(item => <CollectionCard key={item.id} item={item} type="album" onActivate={onCollectionActivate} />)}
-          </div>
-        )}
-
-        {activeTab === 'Playlists' && (
-          <div className="search-results-grid">
-            {syntheticPlaylists.map(item => <CollectionCard key={item.id} item={item} type="playlist" onActivate={onCollectionActivate} />)}
-          </div>
-        )}
-
-        {activeTab === 'Podcasts' && (
-          <div className="search-results-grid">
-            {podcastsData.map((item, i) => <CollectionCard key={`podcast-${item.id}-${i}`} item={item} type="podcast" onActivate={onCollectionActivate} />)}
-          </div>
-        )}
-
       </motion.div>
     </div>
   );
