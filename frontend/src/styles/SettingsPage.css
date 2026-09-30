@@ -61,7 +61,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: #1DB954;
+  background-color: #334155;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -144,7 +144,7 @@
 
 /* Premium Card */
 .premium-card {
-  background: linear-gradient(135deg, #1DB954 0%, #15873d 100%);
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   color: #fff;
   padding: 20px;
   border-radius: 16px;
@@ -152,7 +152,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
-  box-shadow: 0 8px 32px rgba(29, 185, 84, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .premium-card-info {
@@ -172,8 +173,8 @@
 }
 
 .premium-card-btn {
-  background-color: #fff;
-  color: #1DB954;
+  background-color: #e2e8f0;
+  color: #0f172a;
   border: none;
   padding: 8px 16px;
   border-radius: 20px;
@@ -197,7 +198,7 @@
 
 .storage-bar-fill {
   height: 100%;
-  background-color: #1DB954;
+  background-color: #e2e8f0;
   border-radius: 3px;
 }
 
@@ -213,7 +214,7 @@
 }
 
 .toggle-switch.active {
-  background-color: #1DB954;
+  background-color: #e2e8f0;
 }
 
 .toggle-thumb {
@@ -341,7 +342,7 @@
   flex: 1;
   width: 20px;
   margin-bottom: 12px;
-  accent-color: #1DB954;
+  accent-color: #e2e8f0;
 }
 
 .eq-slider-col span {
