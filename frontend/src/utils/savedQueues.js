@@ -1,8 +1,7 @@
 const STORAGE_KEY = 'music_app_saved_queues_v1';
 
 const normalizeSong = (song) => ({
-  id: String(song?.videoId || song?.id || ''),
-  videoId: String(song?.videoId || song?.id || ''),
+  id: String(song?.id || ''),
   title: song?.title || 'Untitled Track',
   artist: song?.artist || song?.channelTitle || song?.subtitle || 'Unknown Artist',
   cover: song?.cover || song?.thumbnail || song?.image || '',
