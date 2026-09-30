@@ -113,7 +113,7 @@
 }
 
 .adp-artist-row:hover .adp-artist-name {
-  color: #1ed760;
+  color: #e2e8f0;
 }
 
 .adp-meta-chips {
@@ -153,8 +153,8 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: #1ed760;
-  color: #000;
+  background: #e2e8f0;
+  color: #0f172a;
   border: none;
   display: flex;
   align-items: center;
@@ -162,7 +162,7 @@
   cursor: pointer;
   transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
   flex-shrink: 0;
-  box-shadow: 0 4px 20px rgba(30, 215, 96, 0.4);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .adp-btn-play:hover {
@@ -213,7 +213,7 @@
 }
 
 .adp-icon-btn.liked {
-  color: #1ed760;
+  color: #e2e8f0;
 }
 
 /* ---------- Tracklist Section ---------- */
@@ -283,7 +283,7 @@
 }
 
 .adp-track-row.playing .adp-idx-num {
-  color: #1ed760;
+  color: #e2e8f0;
 }
 
 .adp-idx-play-icon {
@@ -311,7 +311,7 @@
   max-width: 380px;
 }
 
-.adp-track-row.playing .adp-track-title { color: #1ed760; }
+.adp-track-row.playing .adp-track-title { color: #e2e8f0; }
 
 .adp-track-singer {
   font-size: 12px;
@@ -355,7 +355,7 @@
 }
 
 .adp-row-btn:hover { color: #fff; }
-.adp-row-btn.liked { color: #1ed760; }
+.adp-row-btn.liked { color: #e2e8f0; }
 
 /* ---------- Empty / Error States ---------- */
 .adp-empty {
@@ -456,7 +456,8 @@
 }
 
 .adp-related-play-btn {
-  background: #1ed760;
+  background: #e2e8f0;
+  color: #0f172a;
   border: none;
   border-radius: 50%;
   width: 44px;
@@ -783,7 +784,7 @@
 }
 
 .atab-card-play-btn {
-  background: #1ed760;
+  background: #e2e8f0;
   border: none;
   border-radius: 50%;
   width: 46px;
@@ -791,7 +792,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #000;
+  color: #0f172a;
   cursor: pointer;
   opacity: 0;
   transform: translateY(12px);
@@ -841,7 +842,7 @@
   transform: scale(1.1);
 }
 
-.atab-card-action-btn.liked { color: #1ed760; }
+.atab-card-action-btn.liked { color: #e2e8f0; }
 
 /* Card Info */
 .atab-card-info {
