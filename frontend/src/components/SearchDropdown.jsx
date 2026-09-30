@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Album,
   ChevronRight,
@@ -8,8 +9,6 @@ import {
   Flame,
   History,
   Mic2,
-  MoreVertical,
-  Music4,
   Play,
   Podcast,
   Search as SearchIcon,
@@ -25,13 +24,12 @@ const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=400&q=80';
 
 const SECTION_CONFIG = [
-  { key: 'topResults', title: 'Top Results', type: 'all', icon: Sparkles },
-  { key: 'albums', title: 'Albums', type: 'albums', icon: Album },
-  { key: 'songs', title: 'Songs', type: 'songs', icon: Music4 },
-  { key: 'artists', title: 'Artists', type: 'artists', icon: Mic2, roundImage: true },
-  { key: 'playlists', title: 'Playlists', type: 'playlists', icon: Disc3 },
-  { key: 'podcasts', title: 'Podcasts', type: 'podcasts', icon: Podcast },
-  { key: 'movies', title: 'Movies', type: 'movies', icon: Film },
+  { key: 'topResults', title: 'Top Results', type: 'songs', icon: Sparkles, limit: 3, source: 'songs', showViewAll: false },
+  { key: 'albums', title: 'Albums', type: 'albums', icon: Album, limit: 3 },
+  { key: 'artists', title: 'Artists', type: 'artists', icon: Mic2, roundImage: true, limit: 3 },
+  { key: 'playlists', title: 'Playlists', type: 'playlists', icon: Disc3, limit: 3 },
+  { key: 'podcasts', title: 'Podcasts', type: 'podcasts', icon: Podcast, limit: 3 },
+  { key: 'movies', title: 'Movies', type: 'movies', icon: Film, limit: 3 },
 ];
 
 const emptyGrouped = {
@@ -121,6 +119,51 @@ function SearchEmptyState({ message }) {
   );
 }
 
+const FALLBACK_ARTIST_IMAGE = null;
+
+function SearchDropdownRowImage({ item, isRound }) {
+  const initialSrc = item.type === 'artist'
+    ? (item.photo && !item.photo.includes('unsplash.com') ? item.photo : (item.image && !item.image.includes('unsplash.com') ? item.image : null))
+    : getItemImage(item);
+
+  const [src, setSrc] = useState(initialSrc);
+
+  useEffect(() => {
+    setSrc(initialSrc);
+  }, [initialSrc, item.id]);
+
+  useEffect(() => {
+    if (item.type === 'artist') {
+      if (src && !src.includes('unsplash.com')) return;
+      const artistName = item.name || item.title || getItemTitle(item);
+      if (!artistName) return;
+
+      let isMounted = true;
+      apiClient
+        .get(`/api/music/artist-image?name=${encodeURIComponent(artistName)}`)
+        .then((res) => {
+          if (isMounted && res.data?.url) {
+            setSrc(res.data.url);
+          }
+        })
+        .catch(() => {});
+
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [item, src]);
+
+  return (
+    <img
+      src={src || (item.type === 'artist' ? FALLBACK_ARTIST_IMAGE : FALLBACK_IMAGE)}
+      alt={getItemTitle(item)}
+      loading="lazy"
+      className={`sd2-row__img ${isRound ? 'sd2-row__img--round' : ''}`}
+    />
+  );
+}
+
 function SearchSection({ section, items, activeId, onSelect, onHover, onViewAll }) {
   if (!items.length) return null;
   const Icon = section.icon;
@@ -129,12 +172,14 @@ function SearchSection({ section, items, activeId, onSelect, onHover, onViewAll 
     <section className="sd2-section">
       <div className="sd2-section__head">
         <h4 className="sd2-section__title"><Icon size={14} /> {section.title}</h4>
-        <button type="button" className="sd2-viewall" onMouseDown={(event) => event.preventDefault()} onClick={() => onViewAll(section.type)}>
-          View All <ChevronRight size={12} />
-        </button>
+        {section.showViewAll !== false && (
+          <button type="button" className="sd2-viewall" onMouseDown={(event) => event.preventDefault()} onClick={() => onViewAll(section.type)}>
+            View All <ChevronRight size={12} />
+          </button>
+        )}
       </div>
       <div className="sd2-section__list">
-        {items.slice(0, 3).map((item, index) => {
+        {items.slice(0, section.limit || 3).map((item, index) => {
           const id = `${section.key}-${item.id || getItemTitle(item)}-${index}`;
           const isActive = activeId === id;
           return (
@@ -147,7 +192,7 @@ function SearchSection({ section, items, activeId, onSelect, onHover, onViewAll 
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => onSelect(item, section.type)}
             >
-              <img src={getItemImage(item)} alt={getItemTitle(item)} loading="lazy" className={`sd2-row__img ${section.roundImage ? 'sd2-row__img--round' : ''}`} />
+              <SearchDropdownRowImage item={item} isRound={section.roundImage} />
               <div className="sd2-row__meta">
                 <span className="sd2-row__name">{getItemTitle(item)}</span>
                 <span className="sd2-row__sub">{itemSubtitle(item)}</span>
@@ -161,18 +206,43 @@ function SearchSection({ section, items, activeId, onSelect, onHover, onViewAll 
   );
 }
 
-function SearchRecent({ recentSearches, onSelect }) {
+function SearchRecent({ recentSearches, onSelect, onRemove, onClearAll }) {
   if (!recentSearches.length) return null;
   return (
     <section className="sd2-browse-panel">
       <div className="sd2-section__head">
-        <h4 className="sd2-section__title"><History size={14} /> Recent Searches</h4>
+        <h4 className="sd2-section__title"><History size={16} /> Recent Searches</h4>
+        <button
+          type="button"
+          className="sd2-clear-all-btn"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onClearAll}
+        >
+          Clear All
+        </button>
       </div>
       <div className="sd2-chip-list">
-        {recentSearches.slice(0, 6).map((item) => (
-          <button key={item} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect({ title: item, query: item }, 'songs')}>
-            <Clock3 size={13} /> {item}
-          </button>
+        {recentSearches.slice(0, 10).map((item) => (
+          <div key={item} className="sd2-recent-chip" title={item}>
+            <button
+              type="button"
+              className="sd2-recent-chip__btn"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onSelect({ title: item, query: item }, 'songs')}
+            >
+              <Clock3 size={14} className="sd2-recent-chip__icon" />
+              <span className="sd2-recent-chip__text">{item}</span>
+            </button>
+            <button
+              type="button"
+              className="sd2-recent-chip__del"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onRemove(item)}
+              aria-label={`Remove ${item}`}
+            >
+              ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢
+            </button>
+          </div>
         ))}
       </div>
     </section>
@@ -180,18 +250,32 @@ function SearchRecent({ recentSearches, onSelect }) {
 }
 
 function SearchTrending({ trendingResults, onSelect }) {
-  const items = trendingResults.slice(0, 6);
+  const items = trendingResults.slice(0, 8);
   if (!items.length) return null;
   return (
     <section className="sd2-browse-panel sd2-browse-panel--wide">
       <div className="sd2-section__head">
-        <h4 className="sd2-section__title"><Flame size={14} /> Trending Searches</h4>
+        <h4 className="sd2-section__title"><Flame size={16} /> Trending Searches</h4>
       </div>
       <div className="sd2-trending-grid">
         {items.map((item, index) => (
-          <button key={`${item.id || item.title}-${index}`} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect(item, 'songs')}>
-            <img src={getItemImage(item)} alt={getItemTitle(item)} loading="lazy" />
-            <span>{getItemTitle(item)}</span>
+          <button
+            key={`${item.id || item.title}-${index}`}
+            type="button"
+            className="sd2-trending-card"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onSelect(item, 'songs')}
+          >
+            <div className="sd2-trending-art">
+              <img src={getItemImage(item)} alt={getItemTitle(item)} loading="lazy" />
+              <div className="sd2-trending-art__overlay">
+                <Play size={13} fill="currentColor" strokeWidth={0} />
+              </div>
+            </div>
+            <div className="sd2-trending-info">
+              <span className="sd2-trending-info__title">{getItemTitle(item)}</span>
+              <span className="sd2-trending-info__artist">{item.artist || 'Popular Song'}</span>
+            </div>
           </button>
         ))}
       </div>
@@ -222,9 +306,30 @@ function SearchDropdown({ isOpen, query, onClose, onSearchSelect, onPlayTrack })
 
   const trimmedQuery = sanitizeQuery(query);
 
+  const handleRemoveRecent = useCallback((term) => {
+    setRecentSearches((prev) => {
+      const updated = prev.filter((s) => s !== term);
+      try {
+        localStorage.setItem('recentSearches', JSON.stringify(updated));
+      } catch (err) {
+        console.error(err);
+      }
+      return updated;
+    });
+  }, []);
+
+  const handleClearAllRecent = useCallback(() => {
+    setRecentSearches([]);
+    try {
+      localStorage.removeItem('recentSearches');
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
   const visibleSections = useMemo(() => SECTION_CONFIG.map((section) => ({
     ...section,
-    items: Array.isArray(groupedResults[section.key]) ? groupedResults[section.key].slice(0, 3) : [],
+    items: Array.isArray(groupedResults[section.source || section.key]) ? groupedResults[section.source || section.key].slice(0, section.limit || 3) : [],
   })).filter((section) => section.items.length), [groupedResults]);
 
   const flatItems = useMemo(() => visibleSections.flatMap((section) => section.items.map((item, index) => ({
@@ -239,16 +344,16 @@ function SearchDropdown({ isOpen, query, onClose, onSearchSelect, onPlayTrack })
 
     let cancelled = false;
     const controller = new AbortController();
-    apiClient.get('/api/music/trending', { params: { limit: 6 }, signal: controller.signal })
+    apiClient.get('/api/music/trending', { params: { limit: 8 }, signal: controller.signal })
       .then((response) => {
         if (cancelled) return;
         const results = Array.isArray(response.data?.data) ? response.data.data : [];
         setTrendingResults(results.map((song, index) => ({
           ...song,
-          id: song.id || song.videoId || `trending-${index}`,
+          id: song.id || `trending-${index}`,
           type: 'song',
           title: song.title || 'Trending song',
-          artist: song.artist || song.channelTitle || 'Popular now',
+          artist: song.artist || 'Popular now',
           thumbnail: song.thumbnail || song.cover || song.image || FALLBACK_IMAGE,
         })));
       })
@@ -304,8 +409,12 @@ function SearchDropdown({ isOpen, query, onClose, onSearchSelect, onPlayTrack })
         setIsLoading(true);
         setNoticeMessage('');
         lastRequestKeyRef.current = normalizedRequestKey;
+        const savedLangs = localStorage.getItem('music_pref_languages');
+        const languages = savedLangs ? JSON.parse(savedLangs) : [];
+        const primaryLanguage = languages[0] || 'Hindi';
+
         const response = await apiClient.get('/api/search', {
-          params: { q: trimmedQuery, limit: 12, grouped: true },
+          params: { q: trimmedQuery, limit: 12, grouped: true, language: primaryLanguage },
           signal: controller.signal,
         });
         setGroupedResults(normalizeGroupedPayload(response.data));
@@ -347,42 +456,50 @@ function SearchDropdown({ isOpen, query, onClose, onSearchSelect, onPlayTrack })
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [isOpen, onClose]);
 
-  const selectItem = (item, type) => {
+  const selectItem = useCallback((item, type) => {
     const searchType = item.type === 'movie' ? 'movies' : type;
     const nextQuery = item.type === 'movie' ? getItemTitle(item) : (item.query || getItemTitle(item));
     if (item.type === 'song') onPlayTrack?.(item);
     onSearchSelect?.({ query: nextQuery, title: getItemTitle(item), type: searchType, item });
-  };
+  }, [onPlayTrack, onSearchSelect]);
+
+  const navigate = useNavigate();
 
   const viewAll = (type) => {
     if (!trimmedQuery) return;
-    onSearchSelect?.({ query: trimmedQuery, type, viewAll: true });
+    onClose?.();
+    const targetCategory = type === 'all' ? 'songs' : type;
+    navigate(`/search/${targetCategory}?q=${encodeURIComponent(trimmedQuery)}`);
   };
 
-  const handleKeyDown = (event) => {
-    if (!flatItems.length && event.key === 'Escape') {
-      onClose?.();
-      return;
-    }
+  useEffect(() => {
+    if (!isOpen || !flatItems.length) return undefined;
 
-    const currentIndex = Math.max(0, flatItems.findIndex((item) => item.id === activeId));
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setActiveId(flatItems[(currentIndex + 1) % flatItems.length]?.id || '');
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setActiveId(flatItems[(currentIndex - 1 + flatItems.length) % flatItems.length]?.id || '');
-    } else if (event.key === 'Enter') {
-      const active = flatItems[currentIndex];
-      if (active) {
+    const handleGlobalKeyDown = (event) => {
+      const currentIndex = flatItems.findIndex((item) => item.id === activeId);
+
+      if (event.key === 'ArrowDown' || (event.key === 'Tab' && !event.shiftKey)) {
         event.preventDefault();
-        selectItem(active.item, active.type);
+        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % flatItems.length;
+        setActiveId(flatItems[nextIndex].id);
+      } else if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey)) {
+        event.preventDefault();
+        const prevIndex = currentIndex === -1 ? flatItems.length - 1 : (currentIndex - 1 + flatItems.length) % flatItems.length;
+        setActiveId(flatItems[prevIndex].id);
+      } else if (event.key === 'Enter') {
+        if (currentIndex !== -1) {
+          event.preventDefault();
+          selectItem(flatItems[currentIndex].item, flatItems[currentIndex].type);
+        }
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose?.();
       }
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      onClose?.();
-    }
-  };
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isOpen, flatItems, activeId, selectItem, onClose]);
 
   if (!isOpen) return null;
 
@@ -390,11 +507,16 @@ function SearchDropdown({ isOpen, query, onClose, onSearchSelect, onPlayTrack })
   const showBrowse = !trimmedQuery;
 
   return (
-    <div ref={dropdownRef} className="sd2" role="listbox" aria-label="Search results" tabIndex={-1} onKeyDown={handleKeyDown}>
+    <div ref={dropdownRef} className="sd2" role="listbox" aria-label="Search results" tabIndex={-1}>
       <div className="sd2__body">
         {showBrowse ? (
           <div className="sd2__browse">
-            <SearchRecent recentSearches={recentSearches} onSelect={selectItem} />
+            <SearchRecent
+              recentSearches={recentSearches}
+              onSelect={selectItem}
+              onRemove={handleRemoveRecent}
+              onClearAll={handleClearAllRecent}
+            />
             <SearchTrending trendingResults={trendingResults} onSelect={selectItem} />
           </div>
         ) : isLoading ? (
@@ -405,7 +527,7 @@ function SearchDropdown({ isOpen, query, onClose, onSearchSelect, onPlayTrack })
               <SearchSection
                 key={section.key}
                 section={section}
-                items={groupedResults[section.key] || []}
+                items={groupedResults[section.source || section.key] || []}
                 activeId={activeId}
                 onHover={setActiveId}
                 onSelect={selectItem}
@@ -418,7 +540,13 @@ function SearchDropdown({ isOpen, query, onClose, onSearchSelect, onPlayTrack })
         )}
 
         {hasAny && noticeMessage ? <div className="sd2__notice">{noticeMessage}</div> : null}
-        <div className="sd2__kbd-hint">Use arrow keys to move, Enter to open, Esc to close</div>
+        <div className="sd2__kbd-hint">
+          <span><kbd>Up</kbd><kbd>Down</kbd> to navigate</span>
+          <span className="sd2__kbd-dot">|</span>
+          <span><kbd>Enter</kbd> to select</span>
+          <span className="sd2__kbd-dot">|</span>
+          <span><kbd>Esc</kbd> to close</span>
+        </div>
       </div>
     </div>
   );
