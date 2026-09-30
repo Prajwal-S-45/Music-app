@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import apiClient from '../api/client';
 import '../styles/ExternalStreamPlayer.css';
@@ -70,7 +70,7 @@ function ExternalStreamPlayer({
         }
 
         setSongs(parsedSongs);
-      } catch (requestError) {
+      } catch {
         setError('Could not load songs from API.');
         setSongs([]);
       } finally {
@@ -117,7 +117,7 @@ function ExternalStreamPlayer({
     try {
       await audio.play();
       setIsPlaying(true);
-    } catch (playError) {
+    } catch {
       setError('Playback blocked by browser. Click play again.');
       setIsPlaying(false);
     }
