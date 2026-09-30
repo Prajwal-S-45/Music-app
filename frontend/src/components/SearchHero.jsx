@@ -6,12 +6,11 @@ import { formatDuration } from './SearchResults';
 function SearchHero({ song, isLiked, onPlayTrack, onLikeTrack, onQueueTrack }) {
   if (!song) return null;
 
-  // Mock details to fulfill the premium layout requirements since API might lack these
-  const language = 'Global';
+  const language = song.language || 'Global';
   const genre = 'Pop / Soundtrack';
   const popularity = 'Trending';
   const listeners = '14.2M';
-  const releaseYear = new Date().getFullYear();
+  const releaseYear = song.year || new Date().getFullYear();
 
   const handlePlay = useCallback(() => {
     onPlayTrack?.(song);
