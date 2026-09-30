@@ -46,8 +46,8 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  background-color: #1ed760;
-  color: #000;
+  background-color: #e2e8f0;
+  color: #0f172a;
   font-weight: 800;
   border-radius: 8px;
   font-size: 18px;
@@ -176,8 +176,8 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  background-color: #1ed760;
-  color: #000;
+  background-color: #e2e8f0;
+  color: #0f172a;
   border-radius: 50%;
 }
 
@@ -243,7 +243,7 @@
   margin-left: -16px;
   border-radius: 8px;
   width: calc(100% + 32px);
-  color: #1ed760;
+  color: #e2e8f0;
 }
 
 .desktop-view__nav-section p {
@@ -329,7 +329,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #1ed760;
+  color: #e2e8f0;
   margin-bottom: 8px;
 }
 
@@ -358,8 +358,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: #1ed760;
-  color: #000;
+  background-color: #e2e8f0;
+  color: #0f172a;
   border: none;
   padding: 12px 32px;
   border-radius: 32px;
@@ -541,8 +541,8 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background-color: #1ed760;
-  color: #000;
+  background-color: #e2e8f0;
+  color: #0f172a;
   border: none;
   display: flex;
   align-items: center;
@@ -822,8 +822,8 @@
 }
 
 .desktop-view__player-controls button.play-pause {
-  background-color: #1ed760;
-  color: #000;
+  background-color: #e2e8f0;
+  color: #0f172a;
   border-radius: 50%;
   width: 32px;
   height: 32px;
@@ -866,7 +866,7 @@
 
 .progress-bar:hover .progress,
 .volume-bar:hover .volume {
-  background-color: #1db954;
+  background-color: #e2e8f0;
 }
 
 .desktop-view__player-right {
