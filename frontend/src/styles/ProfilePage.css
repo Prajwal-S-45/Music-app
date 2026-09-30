@@ -61,7 +61,7 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1db954, #121212);
+  background: linear-gradient(135deg, #334155, #0f172a);
   border: 4px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   display: flex;
@@ -112,9 +112,9 @@
 
 .premium-profile__plan-badge {
   align-self: flex-start;
-  background-color: rgba(30, 215, 96, 0.12);
-  color: #1ed760;
-  border: 1px solid rgba(30, 215, 96, 0.24);
+  background-color: rgba(226, 232, 240, 0.12);
+  color: #e2e8f0;
+  border: 1px solid rgba(226, 232, 240, 0.24);
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 11px;
@@ -261,7 +261,7 @@
 }
 
 .premium-profile__tabs button.active {
-  color: #1ed760;
+  color: #e2e8f0;
 }
 
 .premium-profile__tabs button.active::after {
@@ -271,7 +271,7 @@
   left: 0;
   width: 100%;
   height: 3px;
-  background-color: #1ed760;
+  background-color: #e2e8f0;
   border-radius: 2px 2px 0 0;
 }
 
@@ -304,7 +304,7 @@
 .see-all-btn {
   background: transparent;
   border: none;
-  color: #1ed760;
+  color: #cbd5e1;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -334,12 +334,12 @@
   background-color: #181818;
   border: 1px solid rgba(255, 255, 255, 0.02);
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .playlist-item-card:hover {
@@ -398,14 +398,14 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background-color: #1ed760;
-  color: #121212;
+  background-color: #e2e8f0;
+  color: #0f172a;
   display: flex;
   align-items: center;
   justify-content: center;
   transform: translateY(10px);
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
 .playlist-item-card:hover .play-icon-circle {
@@ -425,8 +425,8 @@
 }
 
 .create-card:hover {
-  border-color: #1ed760;
-  background-color: rgba(30, 215, 96, 0.02);
+  border-color: #e2e8f0;
+  background-color: rgba(226, 232, 240, 0.05);
 }
 
 .create-card__inner {
@@ -439,39 +439,54 @@
 }
 
 .plus-icon {
-  color: #1ed760;
+  color: #e2e8f0;
 }
 
-/* Artist Card */
+/* Artist Card - Clean Round Circular Avatar Design */
 .artist-circle-card {
-  background-color: #181818;
-  border-radius: 8px;
-  padding: 16px;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 4px !important;
+  border: none !important;
+  box-shadow: none !important;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: transform 0.25s ease, opacity 0.25s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 12px;
+  gap: 8px;
+  max-width: 140px;
+  margin: 0 auto;
 }
 
 .artist-circle-card:hover {
-  background-color: #282828;
+  background: transparent !important;
+  transform: translateY(-4px);
 }
 
 .artist-circle-card__image {
-  width: 100%;
+  width: 120px;
+  height: 120px;
   aspect-ratio: 1;
   border-radius: 50%;
   overflow: hidden;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.artist-circle-card:hover .artist-circle-card__image {
+  transform: scale(1.04);
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 14px 32px rgba(168, 85, 247, 0.3);
 }
 
 .artist-circle-card img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 50%;
 }
 
 .artist-circle-card strong {
@@ -482,6 +497,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
+  margin-top: 4px;
 }
 
 .artist-circle-card span {
@@ -510,8 +526,8 @@
 
 .playlists-grid-layout {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(135px, 165px));
+  gap: 16px;
 }
 
 .premium-profile__btn-glow {
@@ -610,8 +626,8 @@
 
 .play-song-row-btn {
   background-color: transparent;
-  color: #1ed760;
-  border: 1px solid rgba(30, 215, 96, 0.4);
+  color: #e2e8f0;
+  border: 1px solid rgba(226, 232, 240, 0.3);
   padding: 6px 14px;
   border-radius: 14px;
   font-size: 12px;
@@ -621,8 +637,8 @@
 }
 
 .play-song-row-btn:hover {
-  background-color: rgba(30, 215, 96, 0.08);
-  border-color: #1ed760;
+  background-color: rgba(226, 232, 240, 0.08);
+  border-color: #e2e8f0;
 }
 
 .history-type-cell .badge {
@@ -633,7 +649,7 @@
   text-transform: uppercase;
 }
 
-.history-type-cell .badge.song { background-color: rgba(30, 215, 96, 0.15); color: #1ed760; }
+.history-type-cell .badge.song { background-color: rgba(226, 232, 240, 0.12); color: #e2e8f0; }
 .history-type-cell .badge.playlist { background-color: rgba(59, 130, 246, 0.15); color: #3b82f6; }
 .history-type-cell .badge.artist { background-color: rgba(168, 85, 247, 0.15); color: #a855f7; }
 .history-type-cell .badge.album { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
@@ -777,9 +793,9 @@
 }
 
 .form-message.success {
-  background-color: rgba(30, 215, 96, 0.12);
-  color: #1ed760;
-  border: 1px solid rgba(30, 215, 96, 0.2);
+  background-color: rgba(226, 232, 240, 0.1);
+  color: #e2e8f0;
+  border: 1px solid rgba(226, 232, 240, 0.2);
 }
 
 .form-message.error {
@@ -809,7 +825,7 @@
 }
 
 .avatar-preview.fallback {
-  background: linear-gradient(135deg, #1db954, #121212);
+  background: linear-gradient(135deg, #334155, #0f172a);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -875,7 +891,7 @@
 }
 
 .preset-avatar-option.selected {
-  border-color: #1ed760;
+  border-color: #e2e8f0;
   transform: scale(1.08);
 }
 
@@ -976,8 +992,8 @@
 }
 
 .sub-plan-option.active {
-  border-color: #1ed760;
-  background-color: rgba(30, 215, 96, 0.02);
+  border-color: #e2e8f0;
+  background-color: rgba(226, 232, 240, 0.04);
 }
 
 .sub-plan-option div {
@@ -1001,7 +1017,7 @@
 .sub-plan-option .price {
   font-size: 15px;
   font-weight: 700;
-  color: #1ed760;
+  color: #e2e8f0;
   white-space: nowrap;
 }
 
@@ -1026,7 +1042,7 @@
 }
 
 .card-logo {
-  color: #1ed760;
+  color: #e2e8f0;
   display: flex;
   align-items: center;
 }
@@ -1261,7 +1277,7 @@
   }
 
   .mobile-profile__stat-icon.liked { color: #a855f7; }
-  .mobile-profile__stat-icon.downloads { color: #22c55e; }
+  .mobile-profile__stat-icon.downloads { color: #e2e8f0; }
   .mobile-profile__stat-icon.history { color: #f97316; }
   .mobile-profile__stat-icon.following { color: #3b82f6; }
 
