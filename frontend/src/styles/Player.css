@@ -295,8 +295,8 @@
 }
 
 .socket-dot.online {
-  background: #22c55e;
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
+  background: #e2e8f0;
+  box-shadow: 0 0 0 4px rgba(226, 232, 240, 0.24);
 }
 
 .socket-dot.offline {
