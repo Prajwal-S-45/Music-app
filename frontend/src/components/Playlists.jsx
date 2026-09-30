@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { deleteSavedQueue, getSavedQueues, renameSavedQueue } from '../utils/savedQueues';
 import PlaylistCard from './PlaylistCard';
-import { 
-  Search, Plus, LayoutGrid, List, ArrowLeft, Bell, User, Download, Music, 
-  Heart, Disc, Radio, Mic, Clock, RefreshCw, Shuffle, Settings, ChevronRight, 
-  Play, Crown, X 
+import {
+  Search, Plus, LayoutGrid, List, ArrowLeft, Bell, User, Download, Music,
+  Heart, Disc, Radio, Mic, Clock, RefreshCw, Shuffle, Settings, ChevronRight,
+  Play, Crown, X
 } from 'lucide-react';
 import apiClient from '../api/client';
 import premiumBg from '../assets/premium_header_bg.png';
@@ -123,7 +123,7 @@ function Playlists({ user: propUser, onUserUpdate, onPlayAll }) {
         const list = res.data?.data || [];
         setLikedCount(list.length);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [token, user]);
 
   useEffect(() => {
@@ -239,7 +239,7 @@ function Playlists({ user: propUser, onUserUpdate, onPlayAll }) {
           </div>
 
           {/* Subscription / Profile Card */}
-          <div 
+          <div
             className="library-mobile-sub-card"
             style={{ backgroundImage: `url(${isPremium ? premiumBg : nonPremiumBg})` }}
           >
@@ -293,7 +293,7 @@ function Playlists({ user: propUser, onUserUpdate, onPlayAll }) {
               </div>
               <div className="library-mobile-grid-text">
                 <strong>Liked Songs</strong>
-                <span>{likedCount || 0} songs</span>
+                <span>{likedCount} songs</span>
               </div>
               <ChevronRight size={18} className="chevron" />
             </button>
