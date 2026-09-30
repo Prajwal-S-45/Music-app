@@ -284,21 +284,21 @@ function SettingsPage({ user }) {
             {sheet === 'audioQuality' && ['Low', 'Normal', 'High', 'Very High'].map(q => (
               <div key={q} className="sheet-item" onClick={() => handlePrefChange('audioQuality', q)}>
                 <span>{q}</span>
-                {prefs.audioQuality === q && <Check size={20} color="#1DB954" />}
+                {prefs.audioQuality === q && <Check size={20} color="#e2e8f0" />}
               </div>
             ))}
 
             {sheet === 'language' && ['English', 'Hindi', 'Spanish', 'French'].map(l => (
               <div key={l} className="sheet-item" onClick={() => handlePrefChange('language', l)}>
                 <span>{l}</span>
-                {prefs.language === l && <Check size={20} color="#1DB954" />}
+                {prefs.language === l && <Check size={20} color="#e2e8f0" />}
               </div>
             ))}
 
             {sheet === 'theme' && ['Dark', 'Light', 'System'].map(t => (
               <div key={t} className="sheet-item" onClick={() => handlePrefChange('theme', t)}>
                 <span>{t}</span>
-                {prefs.theme === t && <Check size={20} color="#1DB954" />}
+                {prefs.theme === t && <Check size={20} color="#e2e8f0" />}
               </div>
             ))}
           </div>
