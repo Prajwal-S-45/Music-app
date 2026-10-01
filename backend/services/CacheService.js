@@ -5,6 +5,25 @@ class CacheService {
     this.client = null;
     this.memoryCache = new Map();
     this.isRedisConnected = false;
+    this.maxCacheSize = 1000;
+
+    // Periodically clean up expired entries
+    this.cleanupInterval = setInterval(() => {
+      this._pruneExpired();
+    }, 10 * 60 * 1000);
+
+    if (this.cleanupInterval.unref) {
+      this.cleanupInterval.unref();
+    }
+  }
+
+  _pruneExpired() {
+    const now = Date.now();
+    for (const [key, entry] of this.memoryCache.entries()) {
+      if (entry.expiresAt && entry.expiresAt < now) {
+        this.memoryCache.delete(key);
+      }
+    }
   }
 
   async connect() {
@@ -39,10 +58,11 @@ class CacheService {
     if (this.isRedisConnected && this.client) {
       try {
         const data = await this.client.get(key);
-        return data ? JSON.parse(data) : null;
+        if (data !== null) {
+          return JSON.parse(data);
+        }
       } catch (error) {
         console.error(`Redis GET error for key ${key}:`, error);
-        // Fallback to memory cache on error
       }
     }
 
@@ -61,30 +81,43 @@ class CacheService {
     if (this.isRedisConnected && this.client) {
       try {
         await this.client.setEx(key, ttlSeconds, JSON.stringify(value));
+        // Remove memory cache entry if successfully written to Redis
+        this.memoryCache.delete(key);
         return;
       } catch (error) {
         console.error(`Redis SET error for key ${key}:`, error);
-        // Fallback to memory cache on error
       }
     }
 
     // Memory Cache Fallback
+    this.memoryCache.delete(key);
     this.memoryCache.set(key, {
       value,
       expiresAt: Date.now() + (ttlSeconds * 1000)
     });
+
+    // Enforce size limit for in-memory cache
+    if (this.memoryCache.size > this.maxCacheSize) {
+      this._pruneExpired();
+      if (this.memoryCache.size > this.maxCacheSize) {
+        for (const k of this.memoryCache.keys()) {
+          if (this.memoryCache.size <= this.maxCacheSize) break;
+          this.memoryCache.delete(k);
+        }
+      }
+    }
   }
 
   async delete(key) {
     if (this.isRedisConnected && this.client) {
       try {
         await this.client.del(key);
-        return;
       } catch (error) {
         console.error(`Redis DEL error for key ${key}:`, error);
       }
     }
     
+    // Always delete from memory cache to avoid stale reads
     this.memoryCache.delete(key);
   }
 }
