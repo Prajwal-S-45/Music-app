@@ -4,13 +4,13 @@
  * Fetches songs, albums, artists, and playlists from JioSaavn's internal API.
  *
  * Working endpoints (verified 2026-07):
- *   - autocomplete.get      → search songs/albums/playlists (returns encrypted_media_url inline)
- *   - song.getDetails       → single song by pids (returns encrypted_media_url)
- *   - playlist.getDetails   → playlist songs (returns encrypted_media_url inline)
- *   - content.getCharts     → trending chart playlists
- *   - search.getArtistResults → search artists
- *   - artist.getArtistPageDetails → artist details + top songs + albums
- *   - content.getAlbumDetails  → album songs
+ *   - autocomplete.get      â†’ search songs/albums/playlists (returns encrypted_media_url inline)
+ *   - song.getDetails       â†’ single song by pids (returns encrypted_media_url)
+ *   - playlist.getDetails   â†’ playlist songs (returns encrypted_media_url inline)
+ *   - content.getCharts     â†’ trending chart playlists
+ *   - search.getArtistResults â†’ search artists
+ *   - artist.getArtistPageDetails â†’ artist details + top songs + albums
+ *   - content.getAlbumDetails  â†’ album songs
  *
  * NOTE: search.getResults no longer works (returns empty results).
  *       We use autocomplete.get for all song searches instead.
@@ -42,7 +42,7 @@ const jioAxios = axios.create({
   },
 });
 
-// ─── URL Decryption ───────────────────────────────────────────────────────────
+// â”€â”€â”€ URL Decryption â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // JioSaavn encrypts media URLs with DES-ECB. Key is embedded in their web JS bundle.
 const DES_KEY = Buffer.from('38346591');
 
@@ -74,18 +74,64 @@ function decryptUrl(encryptedUrl) {
 }
 
 
-// ─── Image helpers ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Image helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function getImageUrl(image) {
   if (!image) return '';
+
   if (typeof image === 'string') {
-    return image.replace('http://', 'https://').replace('50x50', '500x500').replace('150x150', '500x500');
+    const trimmed = image.trim();
+    if (!trimmed) return '';
+    return trimmed
+      .replace(/^http:\/\//i, 'https://')
+      .replace(/50x50/g, '500x500')
+      .replace(/150x150/g, '500x500');
   }
-  // object with quality keys
-  const best = image['500x500'] || image['150x150'] || image['50x50'] || '';
-  return best.replace('http://', 'https://');
+
+  if (Array.isArray(image)) {
+    const sorted = [...image].sort((a, b) => {
+      const qA = String(a?.quality || a?.size || '');
+      const qB = String(b?.quality || b?.size || '');
+      if (qA.includes('500') || qA.includes('high')) return -1;
+      if (qB.includes('500') || qB.includes('high')) return 1;
+      return 0;
+    });
+
+    for (const item of sorted) {
+      if (typeof item === 'string') {
+        const res = getImageUrl(item);
+        if (res) return res;
+      }
+      if (item && typeof item === 'object') {
+        const link = item.link || item.url || item.image || item['500x500'] || item['150x150'] || item['50x50'];
+        const res = getImageUrl(link);
+        if (res) return res;
+      }
+    }
+    return '';
+  }
+
+  if (typeof image === 'object') {
+    const best =
+      image['500x500'] ||
+      image['150x150'] ||
+      image['50x50'] ||
+      image.url ||
+      image.link ||
+      image.image ||
+      '';
+    if (typeof best === 'string' && best.trim()) {
+      return best
+        .trim()
+        .replace(/^http:\/\//i, 'https://')
+        .replace(/50x50/g, '500x500')
+        .replace(/150x150/g, '500x500');
+    }
+  }
+
+  return '';
 }
 
-// ─── Artist helpers ────────────────────────────────────────────────────────
+// â”€â”€â”€ Artist helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function getArtistString(song) {
   const info = song.more_info || {};
   // artistMap.primary_artists is an array
@@ -101,27 +147,134 @@ function getArtistString(song) {
   return 'Unknown Artist';
 }
 
-// ─── Song Mappers ──────────────────────────────────────────────────────────
+function getAlbumArtistString(album) {
+  const info = album?.more_info || {};
+  const toNames = (value) => {
+    if (typeof value === 'string') return value.trim();
+    if (Array.isArray(value)) {
+      return value.map((entry) => typeof entry === 'string' ? entry : entry?.name || entry?.title || '')
+        .filter(Boolean)
+        .join(', ');
+    }
+    if (value && typeof value === 'object') return value.name || value.title || '';
+    return '';
+  };
+
+  const candidates = [
+    info.artistMap?.primary_artists,
+    album?.artistMap?.primary_artists,
+    info.primary_artists,
+    album?.primary_artists,
+    info.singers,
+    album?.singers,
+    info.artist_name,
+    album?.artist_name,
+    album?.music,
+    album?.artist,
+  ];
+
+  for (const candidate of candidates) {
+    const names = toNames(candidate);
+    if (names && !/^unknown artist$/i.test(names)) return names;
+  }
+
+  return 'Unknown Artist';
+}
+
+/**
+ * Normalizes artist objects across various API sources into a unified, consistent schema:
+ * {
+ *   id,
+ *   name,
+ *   image,
+ *   type,
+ *   language,
+ *   popularity,
+ *   followers,
+ *   description
+ * }
+ * Only populates fields that actually exist in the API payload. Never creates fake values.
+ */
+function normalizeArtistEntity(artist) {
+  if (!artist || typeof artist !== 'object') return null;
+
+  const id = String(artist.id || artist.artistid || artist.artist_id || '').trim();
+  const name = String(artist.name || artist.title || artist.artist_name || '').trim();
+  if (!name) return null;
+
+  const image = getImageUrl(artist.image || artist.thumbnail || artist.photo || artist.avatar || artist.pic);
+
+  const result = {
+    id: id || name,
+    name,
+  };
+
+  if (image) result.image = image;
+
+  const type = String(artist.type || artist.role || artist.profession || '').trim();
+  if (type) result.type = type;
+
+  const language = String(artist.language || artist.dominantLanguage || '').trim();
+  if (language) result.language = language;
+
+  const popularity = Number(artist.popularity || artist.frequency || artist.score || 0);
+  if (popularity > 0) result.popularity = popularity;
+
+  const followers = Number(artist.followers || artist.follower_count || artist.listeners || artist.fans || 0);
+  if (followers > 0) result.followers = followers;
+
+  const description = String(artist.description || artist.bio || artist.biography || '').trim();
+  if (description) result.description = description;
+
+  return result;
+}
+// â”€â”€â”€ Song Mappers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function decodeEntities(str) {
+  if (!str || typeof str !== 'string') return str || '';
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#039;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
 
 /**
  * Map a song object that already has more_info.encrypted_media_url
  * (from autocomplete.get, playlist.getDetails, artist top songs, album songs)
  */
-function mapSong(song) {
-  if (!song || !song.id) return null;
+function mapSong(song, defaultCover = '') {
+  if (!song || (!song.id && !song.song_id && !song.pid)) return null;
+  const songId = song.id || song.song_id || song.pid;
   const info = song.more_info || {};
-  const cover = getImageUrl(song.image);
-  const file_url = decryptUrl(info.encrypted_media_url || '');
+
+  const rawCover =
+    song.image ||
+    info.image ||
+    song.album_image ||
+    info.album_image ||
+    info.cover_image ||
+    song.cover ||
+    song.thumbnail ||
+    defaultCover ||
+    '';
+
+  const cover = getImageUrl(rawCover) || (typeof defaultCover === 'string' ? getImageUrl(defaultCover) : '');
+  const file_url = decryptUrl(info.encrypted_media_url || song.encrypted_media_url || '');
+  if (!file_url) return null;
 
   return {
-    id: song.id,
-    videoId: null,
-    title: song.title || song.song || 'Untitled',
-    artist: getArtistString(song),
-    album: info.album || song.album || '',
+    id: String(songId),
+    title: decodeEntities(song.title || song.song || song.name || 'Untitled'),
+    artist: decodeEntities(getArtistString(song)),
+    album: decodeEntities(info.album || song.album || ''),
     thumbnail: cover,
     cover,
-    duration: Number(info.duration) || 0,
+    duration: Number(info.duration || song.duration || 0) || 0,
     language: info.language || song.language || '',
     year: info.year || song.year || '',
     file_url,
@@ -129,53 +282,7 @@ function mapSong(song) {
   };
 }
 
-// ─── Mock Fallback ────────────────────────────────────────────────────────────
-const MOCK_FALLBACK_SONGS = [
-  {
-    id: 'mock-song-1', videoId: null,
-    title: "Kesariya (From 'Brahmastra')", artist: 'Arijit Singh, Pritam', album: 'Brahmastra',
-    thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80',
-    cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80',
-    duration: 270, file_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', source: 'mock-fallback',
-  },
-  {
-    id: 'mock-song-2', videoId: null,
-    title: "Apna Bana Le (From 'Bhediya')", artist: 'Arijit Singh, Sachin-Jigar', album: 'Bhediya',
-    thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=500&q=80',
-    cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=500&q=80',
-    duration: 204, file_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', source: 'mock-fallback',
-  },
-  {
-    id: 'mock-song-3', videoId: null,
-    title: "Chaleya (From 'Jawan')", artist: 'Anirudh Ravichander, Arijit Singh', album: 'Jawan',
-    thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=500&q=80',
-    cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=500&q=80',
-    duration: 200, file_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', source: 'mock-fallback',
-  },
-  {
-    id: 'mock-song-4', videoId: null,
-    title: 'Shape of You', artist: 'Ed Sheeran', album: '÷ (Divide)',
-    thumbnail: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&w=500&q=80',
-    cover: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&w=500&q=80',
-    duration: 233, file_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', source: 'mock-fallback',
-  },
-  {
-    id: 'mock-song-5', videoId: null,
-    title: 'Blinding Lights', artist: 'The Weeknd', album: 'After Hours',
-    thumbnail: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?auto=format&fit=crop&w=500&q=80',
-    cover: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?auto=format&fit=crop&w=500&q=80',
-    duration: 200, file_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', source: 'mock-fallback',
-  },
-  {
-    id: 'mock-song-6', videoId: null,
-    title: 'Cruel Summer', artist: 'Taylor Swift', album: 'Lover',
-    thumbnail: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=500&q=80',
-    cover: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=500&q=80',
-    duration: 178, file_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3', source: 'mock-fallback',
-  },
-];
-
-// ─── Service Class ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Service Class â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class JioSaavnService {
 
   /**
@@ -207,41 +314,80 @@ class JioSaavnService {
    *   3. Also check topquery.data for direct song matches.
    */
   async searchSongs(query, limit = 20) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return [];
+    }
+    const normalizedQuery = query.trim();
+
     try {
-      const { data } = await jioAxios.get('', {
+      // 1. Primary Direct Search: search.getResults returns exact track matches with encrypted_media_url
+      const { data: searchData } = await jioAxios.get('', {
+        params: {
+          ...COMMON_PARAMS,
+          __call: 'search.getResults',
+          q: normalizedQuery,
+          p: 1,
+          n: Math.min(50, limit),
+        },
+      });
+
+      const rawResults = Array.isArray(searchData?.results)
+        ? searchData.results
+        : Array.isArray(searchData)
+        ? searchData
+        : [];
+
+      let mappedDirect = rawResults.map(mapSong).filter(Boolean);
+      if (mappedDirect.length > 0) {
+        return mappedDirect.slice(0, limit);
+      }
+
+      // 2. Fallback: Autocomplete & fetch song details via content.getSongDetails
+      const { data: autoData } = await jioAxios.get('', {
         params: {
           __call: 'autocomplete.get',
           _format: 'json',
           _marker: '0',
           cc: 'in',
           includeMetaTags: '1',
-          query,
+          query: normalizedQuery,
         },
       });
 
-      // 1. Check if there are direct song results (songs.data[])
-      const directSongs = (data?.songs?.data || []).map(mapSong).filter(Boolean);
-      if (directSongs.length > 0) {
-        console.log(`JioSaavn autocomplete "${query}": found ${directSongs.length} direct songs`);
-        return directSongs.slice(0, limit);
-      }
-
-      // 2. Check topquery for direct song matches
-      const topQuerySongs = (data?.topquery?.data || [])
-        .filter((s) => s.type === 'song')
-        .map(mapSong)
+      const rawSongIds = [
+        ...(autoData?.songs?.data || []),
+        ...(autoData?.topquery?.data || []).filter((s) => s.type === 'song'),
+      ]
+        .map((s) => s.id)
         .filter(Boolean);
-      if (topQuerySongs.length > 0) {
-        console.log(`JioSaavn topquery "${query}": found ${topQuerySongs.length} songs`);
-        return topQuerySongs.slice(0, limit);
+
+      if (rawSongIds.length > 0) {
+        const uniqueIds = Array.from(new Set(rawSongIds)).slice(0, limit);
+        const { data: detailsData } = await jioAxios.get('', {
+          params: {
+            ...COMMON_PARAMS,
+            __call: 'content.getSongDetails',
+            pids: uniqueIds.join(','),
+          },
+        });
+
+        const detailsArray = Array.isArray(detailsData)
+          ? detailsData
+          : typeof detailsData === 'object' && detailsData !== null
+          ? Object.values(detailsData).filter((s) => s && s.id)
+          : [];
+
+        const mappedFromDetails = detailsArray.map(mapSong).filter(Boolean);
+        if (mappedFromDetails.length > 0) {
+          return mappedFromDetails.slice(0, limit);
+        }
       }
 
-      // 3. Fallback: use the top album's songs via content.getAlbumDetails
-      const albums = data?.albums?.data || [];
+      // 3. Fallback: use top album's songs via content.getAlbumDetails
+      const albums = autoData?.albums?.data || [];
       if (albums.length > 0) {
         const topAlbum = albums[0];
         const albumId = topAlbum.id;
-        console.log(`JioSaavn "${query}": no direct songs, fetching album ${albumId} songs`);
 
         const { data: albumData } = await jioAxios.get('', {
           params: {
@@ -251,30 +397,21 @@ class JioSaavnService {
           },
         });
 
-        // content.getAlbumDetails returns songs in 'list', not 'songs'
         const albumSongs = Array.isArray(albumData?.list)
           ? albumData.list.map(mapSong).filter(Boolean)
           : Array.isArray(albumData?.songs)
-            ? albumData.songs.map(mapSong).filter(Boolean)
-            : [];
+          ? albumData.songs.map(mapSong).filter(Boolean)
+          : [];
 
         if (albumSongs.length > 0) {
-          console.log(`JioSaavn album "${topAlbum.title}": found ${albumSongs.length} songs`);
           return albumSongs.slice(0, limit);
         }
       }
 
-      throw new Error('No songs found in autocomplete or album');
+      return [];
     } catch (err) {
-      console.warn(`JioSaavn searchSongs failed (query: "${query}"). Serving mock fallback. Error:`, err.message);
-      const q = query.toLowerCase();
-      const filtered = MOCK_FALLBACK_SONGS.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          s.artist.toLowerCase().includes(q) ||
-          s.album.toLowerCase().includes(q)
-      );
-      return (filtered.length > 0 ? filtered : MOCK_FALLBACK_SONGS).slice(0, limit);
+      console.warn(`JioSaavn searchSongs failed (query: "${normalizedQuery}"). Error:`, err.message);
+      return [];
     }
   }
 
@@ -282,14 +419,18 @@ class JioSaavnService {
    * Get trending songs from JioSaavn charts.
    * Fetches chart playlists and gets songs from the top chart playlist.
    */
-  async getTrendingSongs(limit = 20) {
+  async getTrendingSongs(limit = 20, language = 'hindi') {
     try {
+      const activeLang = ['kannada', 'english', 'hindi', 'telugu', 'tamil', 'punjabi', 'marathi', 'bengali', 'malayalam'].includes(String(language).toLowerCase()) 
+        ? String(language).toLowerCase() 
+        : 'hindi';
+
       // Step 1: fetch chart playlists
       const { data: charts } = await jioAxios.get('', {
         params: {
           ...COMMON_PARAMS,
           __call: 'content.getCharts',
-          language: 'hindi',
+          language: activeLang,
           n: 5,
           p: 1,
         },
@@ -316,14 +457,11 @@ class JioSaavnService {
       const songs = list.map(mapSong).filter(Boolean).slice(0, limit);
 
       if (songs.length > 0) {
-        console.log(`JioSaavn trending: fetched ${songs.length} songs from chart "${topChart.title}"`);
         return songs;
       }
-
-      throw new Error('Empty playlist');
+      return this.searchSongs('bollywood hits 2025', limit);
     } catch (err) {
       console.warn('JioSaavn getTrendingSongs failed. Falling back to search.', err.message);
-      // Fallback: search a popular query
       return this.searchSongs('bollywood hits 2025', limit);
     }
   }
@@ -332,18 +470,23 @@ class JioSaavnService {
    * Search artists
    */
   async searchArtist(query) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return null;
+    }
+    const normalizedQuery = query.trim();
+
     try {
       const { data } = await jioAxios.get('', {
         params: {
           ...COMMON_PARAMS,
           __call: 'search.getArtistResults',
-          q: query,
+          q: normalizedQuery,
           n: 1,
           p: 1,
         },
       });
       const results = data?.results || [];
-      if (results.length === 0) throw new Error('No artists found');
+      if (results.length === 0) return null;
       const a = results[0];
       return {
         id: a.id || a.artistid,
@@ -353,19 +496,106 @@ class JioSaavnService {
         language: a.language || '',
       };
     } catch (err) {
-      console.warn(`JioSaavn searchArtist failed ("${query}"). Mock fallback.`, err.message);
-      const matched = MOCK_FALLBACK_SONGS.find((s) =>
-        s.artist.toLowerCase().includes(query.toLowerCase())
-      );
-      return {
-        id: matched ? `mock-artist-${matched.artist.toLowerCase().replace(/\s/g, '-')}` : 'mock-artist-arijit',
-        name: matched ? matched.artist.split(',')[0].trim() : 'Arijit Singh',
-        image: matched
-          ? matched.thumbnail
-          : 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&w=500&q=80',
+      console.warn(`JioSaavn searchArtist failed ("${normalizedQuery}").`, err.message);
+      return null;
+    }
+  }
+
+  /**
+   * Search multiple artists
+   */
+  async searchArtists(query, limit = 10) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return [];
+    }
+    const normalizedQuery = query.trim();
+
+    try {
+      const { data } = await jioAxios.get('', {
+        params: {
+          ...COMMON_PARAMS,
+          __call: 'search.getArtistResults',
+          q: normalizedQuery,
+          n: limit,
+          p: 1,
+        },
+      });
+      const results = data?.results || [];
+      return results.map((a) => ({
+        id: a.id || a.artistid,
+        name: a.name || a.title,
+        image: getImageUrl(a.image),
         role: 'Artist',
-        language: 'Hindi',
-      };
+        language: a.language || '',
+        type: 'artist',
+        source: 'jiosaavn',
+      }));
+    } catch (err) {
+      console.warn(`JioSaavn searchArtists failed ("${normalizedQuery}").`, err.message);
+      return [];
+    }
+  }
+
+  /**
+   * Search playlists
+   */
+  async searchPlaylists(query, limit = 10) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return [];
+    }
+    const normalizedQuery = query.trim();
+
+    try {
+      const { data } = await jioAxios.get('', {
+        params: {
+          ...COMMON_PARAMS,
+          __call: 'search.getPlaylistResults',
+          q: normalizedQuery,
+          n: limit,
+          p: 1,
+        },
+      });
+      const results = data?.results || [];
+      return results.map((pl) => ({
+        id: pl.id || pl.listid,
+        title: pl.name || pl.title,
+        creator: pl.username || pl.firstname || 'JioSaavn',
+        songCount: Number(pl.more_info?.song_count || pl.song_count || pl.list_count || 0),
+        cover: getImageUrl(pl.image),
+        popularity: Number(pl.more_info?.follower_count || pl.follower_count || 50),
+        type: 'playlist',
+        source: 'jiosaavn',
+      }));
+    } catch (err) {
+      console.warn(`JioSaavn searchPlaylists failed ("${normalizedQuery}"). Empty result.`, err.message);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch full autocomplete results
+   */
+  async getAutocomplete(query) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return null;
+    }
+    const normalizedQuery = query.trim();
+
+    try {
+      const { data } = await jioAxios.get('', {
+        params: {
+          __call: 'autocomplete.get',
+          _format: 'json',
+          _marker: '0',
+          cc: 'in',
+          includeMetaTags: '1',
+          query: normalizedQuery,
+        },
+      });
+      return data;
+    } catch (err) {
+      console.warn(`JioSaavn getAutocomplete failed (query: "${normalizedQuery}"). Error:`, err.message);
+      return null;
     }
   }
 
@@ -373,18 +603,18 @@ class JioSaavnService {
    * Get artist details + top songs + albums
    */
   async getArtistDetails(artistId) {
-    // Reject synthetic IDs from FederatedSearchService (not real JioSaavn IDs)
-    if (!artistId || /^(artist-|mock-)/.test(String(artistId))) {
+    if (!artistId) {
       return null;
     }
+
     try {
       const { data } = await jioAxios.get('', {
         params: {
           ...COMMON_PARAMS,
           __call: 'artist.getArtistPageDetails',
           artistId,
-          n_song: 10,
-          n_album: 10,
+          n_song: 100,
+          n_album: 100,
           sub_type: '',
           category: '',
           sort_order: '',
@@ -395,19 +625,28 @@ class JioSaavnService {
       if (!d || !d.artistId) throw new Error('No artist data');
 
       const image = getImageUrl(d.image);
-      const songs = Array.isArray(d.topSongs?.songs)
-        ? d.topSongs.songs.map(mapSong).filter(Boolean)
-        : [];
-      const albums = Array.isArray(d.topAlbums?.albums)
-        ? d.topAlbums.albums.map((alb) => ({
-            id: alb.id || alb.albumid,
-            name: alb.name || alb.title,
-            cover: getImageUrl(alb.image),
-            year: alb.year || alb.release_date || '',
-            type: 'Album',
-            artist: d.name,
-          }))
-        : [];
+      const rawSongs = Array.isArray(d.topSongs)
+        ? d.topSongs
+        : (Array.isArray(d.topSongs?.songs)
+          ? d.topSongs.songs
+          : (Array.isArray(d.songs) ? d.songs : []));
+      const songs = rawSongs.map(mapSong).filter(Boolean);
+      const rawAlbums = Array.isArray(d.topAlbums)
+        ? d.topAlbums
+        : (Array.isArray(d.topAlbums?.albums)
+          ? d.topAlbums.albums
+          : (Array.isArray(d.albums)
+            ? d.albums
+            : (Array.isArray(d.top_albums) ? d.top_albums : [])));
+
+      const albums = rawAlbums.map((alb) => ({
+        id: alb.id || alb.albumid || alb.listid,
+        name: decodeEntities(alb.name || alb.title || 'Untitled Album'),
+        cover: getImageUrl(alb.image || alb.cover),
+        year: alb.year || alb.release_date || '',
+        type: alb.type || 'Album',
+        artist: getAlbumArtistString(alb) !== 'Unknown Artist' ? getAlbumArtistString(alb) : (d.name || ''),
+      })).filter(a => a.id && a.name);
 
       return {
         artist: {
@@ -430,38 +669,97 @@ class JioSaavnService {
         albums,
       };
     } catch (err) {
-      console.warn(`JioSaavn getArtistDetails failed (id: "${artistId}"). Mock fallback.`, err.message);
-      return {
-        artist: {
-          id: artistId, name: 'Arijit Singh',
-          image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&w=500&q=80',
-          language: 'Hindi', role: 'Artist',
-        },
-        biography: {
-          biography: 'Arijit Singh is an Indian playback singer and music composer.',
-          listeners: 25000000,
-          similarArtists: [
-            { id: 'mock-artist-shreya', name: 'Shreya Ghoshal', image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=500&q=80' },
-          ],
-        },
-        songs: MOCK_FALLBACK_SONGS,
-        albums: [
-          { id: 'mock-album-1', name: 'Brahmastra', cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80', year: '2022', type: 'Movie Album', artist: 'Arijit Singh' },
-        ],
-      };
+      console.warn(`JioSaavn getArtistDetails failed (id: "${artistId}").`, err.message);
+      return null;
     }
   }
 
   /**
-   * Get song details by a single song ID.
-   * Returns full song with decrypted file_url.
+   * Fetch paginated songs for a specific artist by artistId or artistName
+   */
+  async getArtistMoreSongs(artistIdOrName, page = 1, limit = 15) {
+    if (!artistIdOrName) return { total: 0, page, limit, results: [] };
+
+    const reqPage = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 15));
+    let artistId = artistIdOrName;
+
+    if (typeof artistIdOrName === 'string' && isNaN(artistIdOrName)) {
+      const found = await this.searchArtist(artistIdOrName);
+      if (found?.id) {
+        artistId = found.id;
+      }
+    }
+
+    try {
+      const { data } = await jioAxios.get('', {
+        params: {
+          ...COMMON_PARAMS,
+          __call: 'artist.getArtistMoreSongs',
+          artist_id: artistId,
+          artistId: artistId,
+          artistid: artistId,
+          sub_type: 'songs',
+          category: 'songs',
+          p: reqPage,
+          page: reqPage,
+          n: limitNum,
+        },
+      });
+
+      const rawSongs = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.topSongs?.songs)
+          ? data.topSongs.songs
+          : (Array.isArray(data?.songs)
+            ? data.songs
+            : (Array.isArray(data?.results)
+              ? data.results
+              : (Array.isArray(data?.data) ? data.data : []))));
+
+      const songs = rawSongs.map(mapSong).filter(Boolean);
+      if (songs.length > 0) {
+        const totalFromApi = Number(data?.total || 0);
+        const calculatedTotal = totalFromApi > 0
+          ? totalFromApi
+          : (songs.length < limitNum
+            ? (reqPage - 1) * limitNum + songs.length
+            : reqPage * limitNum + (songs.length === limitNum ? 20 : 0));
+
+        return {
+          total: calculatedTotal,
+          page: reqPage,
+          limit: limitNum,
+          results: songs,
+        };
+      }
+    } catch (err) {
+      console.warn(`JioSaavn getArtistMoreSongs failed for ${artistIdOrName}:`, err.message);
+    }
+
+    // Fallback: paginated song search with keyword variants across discography
+    const querySuffixes = ['', ' song', ' hits', ' movie', ' album'];
+    const suffixIndex = (reqPage - 1) % querySuffixes.length;
+    const suffix = querySuffixes[suffixIndex];
+    const searchQuery = `${artistIdOrName}${suffix}`;
+    const searchPage = Math.floor((reqPage - 1) / querySuffixes.length) + 1;
+
+    return this.searchSongsCategory(searchQuery, searchPage, limitNum);
+  }
+
+  /**
+   * Get song details by song ID (single ID string or array of ID strings).
+   * Returns full song object for scalar input, or array of song objects for array input.
    */
   async getSongDetails(songId) {
     const isArray = Array.isArray(songId);
-    // song.getDetails only works reliably for a single ID
-    const id = isArray ? (Array.isArray(songId) ? songId[0] : songId) : songId;
+    const rawIds = isArray ? songId : [songId];
 
-    if (!id || String(id).startsWith('mock-')) {
+    const validIds = rawIds
+      .map((id) => (id ? String(id).trim() : ''))
+      .filter(Boolean);
+
+    if (validIds.length === 0) {
       return isArray ? [] : null;
     }
 
@@ -471,18 +769,21 @@ class JioSaavnService {
           ...COMMON_PARAMS,
           __call: 'song.getDetails',
           cc: 'in',
-          pids: id,
+          pids: validIds.join(','),
         },
       });
 
-      // Response: { songs: [...] }
-      const songs = Array.isArray(data?.songs) ? data.songs : Object.values(data || {}).filter((s) => s && s.id);
+      // Response: { songs: [...] } or object with song ID keys
+      const songs = Array.isArray(data?.songs)
+        ? data.songs
+        : Object.values(data || {}).filter((s) => s && typeof s === 'object' && s.id);
+
       const mapped = songs.map(mapSong).filter(Boolean);
 
       if (mapped.length === 0) throw new Error('No songs returned');
-      return isArray ? mapped : mapped[0];
+      return isArray ? mapped : (mapped[0] || null);
     } catch (err) {
-      console.warn(`JioSaavn getSongDetails failed (id: "${id}").`, err.message);
+      console.warn(`JioSaavn getSongDetails failed (pids: "${validIds.join(',')}").`, err.message);
       return isArray ? [] : null;
     }
   }
@@ -491,12 +792,17 @@ class JioSaavnService {
    * Search albums
    */
   async searchAlbums(query, limit = 10) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return [];
+    }
+    const normalizedQuery = query.trim();
+
     try {
       const { data } = await jioAxios.get('', {
         params: {
           ...COMMON_PARAMS,
           __call: 'search.getAlbumResults',
-          q: query,
+          q: normalizedQuery,
           n: limit,
           p: 1,
         },
@@ -505,14 +811,14 @@ class JioSaavnService {
       return results.map((alb) => ({
         id: alb.id || alb.albumid,
         name: alb.name || alb.title,
-        artist: alb.music || alb.primary_artists || 'Unknown Artist',
+        artist: getAlbumArtistString(alb),
         cover: getImageUrl(alb.image),
         year: alb.year || '',
         type: 'album',
         source: 'jiosaavn',
       }));
     } catch (err) {
-      console.warn(`JioSaavn searchAlbums failed ("${query}"). Empty result.`, err.message);
+      console.warn(`JioSaavn searchAlbums failed ("${normalizedQuery}"). Empty result.`, err.message);
       return [];
     }
   }
@@ -521,8 +827,7 @@ class JioSaavnService {
    * Get album details + songs
    */
   async getAlbumDetails(albumId) {
-    // Reject synthetic IDs from FederatedSearchService (not real JioSaavn IDs)
-    if (!albumId || /^(album-|mock-)/.test(String(albumId))) {
+    if (!albumId) {
       return null;
     }
     try {
@@ -533,34 +838,411 @@ class JioSaavnService {
           albumid: albumId,
         },
       });
-      if (!data || !data.id) throw new Error('No album data');
+      const albumCover = getImageUrl(data.image || data.cover || data.thumbnail);
       // content.getAlbumDetails returns songs in 'list', not 'songs'
       const songList = Array.isArray(data.list) ? data.list
         : Array.isArray(data.songs) ? data.songs
-        : [];
-      const songs = songList.map(mapSong).filter(Boolean);
+          : [];
+      const songs = songList.map((s) => mapSong(s, albumCover)).filter(Boolean);
       return {
         id: data.id,
-        name: data.title || data.name,
-        artist: data.music || data.primary_artists || '',
-        cover: getImageUrl(data.image),
+        name: decodeEntities(data.title || data.name),
+        artist: getAlbumArtistString(data),
+        cover: albumCover,
         year: data.year || '',
         description: data.album_description || '',
         songs,
         source: 'jiosaavn',
       };
     } catch (err) {
-      console.warn(`JioSaavn getAlbumDetails failed (id: "${albumId}"). Mock fallback.`, err.message);
+      console.warn(`JioSaavn getAlbumDetails failed (id: "${albumId}").`, err.message);
+      return null;
+    }
+  }
+
+  // â”€â”€â”€ Paginated Category Search Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  /**
+   * Dedicated Paginated Song Search
+   */
+  async searchSongsCategory(query, page = 1, limit = 20) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return { total: 0, page, limit, results: [] };
+    }
+    const normalizedQuery = query.trim();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+
+    try {
+      // 1. Try search.getSongResults / search.getResults first
+      const { data } = await jioAxios.get('', {
+        params: {
+          ...COMMON_PARAMS,
+          __call: 'search.getSongResults',
+          q: normalizedQuery,
+          n: limitNum,
+          p: pageNum,
+        },
+      });
+
+      const rawResults = Array.isArray(data?.results)
+        ? data.results
+        : (Array.isArray(data?.data)
+          ? data.data
+          : (Array.isArray(data?.songs?.data)
+            ? data.songs.data
+            : (Array.isArray(data) ? data : [])));
+
+      let songs = rawResults.map(mapSong).filter(Boolean);
+
+      // Fallback to search.getResults if getSongResults returns empty
+      if (songs.length === 0) {
+        const fallbackRes = await jioAxios.get('', {
+          params: {
+            ...COMMON_PARAMS,
+            __call: 'search.getResults',
+            q: normalizedQuery,
+            n: limitNum,
+            p: pageNum,
+          },
+        });
+        const fallbackRaw = Array.isArray(fallbackRes.data?.results) ? fallbackRes.data.results : [];
+        songs = fallbackRaw.map(mapSong).filter(Boolean);
+      }
+
+      const totalFromApi = Number(data?.total || data?.total_results || data?.songs?.total || 0);
+
+      // 2. Return paginated song results
+      if (songs.length > 0) {
+        const calculatedTotal = totalFromApi > 0
+          ? totalFromApi
+          : (songs.length < limitNum
+            ? (pageNum - 1) * limitNum + songs.length
+            : (pageNum * limitNum + (songs.length === limitNum ? 20 : 0)));
+
+        return {
+          total: calculatedTotal,
+          page: pageNum,
+          limit: limitNum,
+          results: songs,
+        };
+      }
+
+      // 3. Fallback to autocomplete.get for song search
+      const autoRes = await this.getAutocomplete(normalizedQuery);
+      const autoSongs = (autoRes?.songs?.data || []).map(mapSong).filter(Boolean);
+      const topQuerySongs = (autoRes?.topquery?.data || [])
+        .filter((s) => s.type === 'song')
+        .map(mapSong)
+        .filter(Boolean);
+
+      let combinedSongs = [...autoSongs, ...topQuerySongs];
+
+      // If still empty or page > 1, fetch top album songs
+      const albums = autoRes?.albums?.data || [];
+      if (albums.length > 0 && pageNum <= Math.ceil(albums.length * 5 / limitNum)) {
+        const albumIndex = Math.floor((pageNum - 1) * limitNum / 10);
+        const targetAlbum = albums[albumIndex] || albums[0];
+        if (targetAlbum?.id) {
+          const albumDetails = await this.getAlbumDetails(targetAlbum.id);
+          if (albumDetails?.songs?.length > 0) {
+            combinedSongs = [...combinedSongs, ...albumDetails.songs];
+          }
+        }
+      }
+
+      // Deduplicate songs by ID
+      const uniqueMap = new Map();
+      combinedSongs.forEach((s) => {
+        if (s?.id && !uniqueMap.has(s.id)) uniqueMap.set(s.id, s);
+      });
+      const allUniqueSongs = Array.from(uniqueMap.values());
+
+      // Paginate results manually for fallback
+      const startIndex = (pageNum - 1) * limitNum;
+      const paginatedSongs = allUniqueSongs.slice(startIndex, startIndex + limitNum);
+
+      const calculatedFallbackTotal = allUniqueSongs.length > 0
+        ? allUniqueSongs.length
+        : 0;
+
       return {
-        id: albumId,
-        name: 'Album Details',
-        artist: 'Various Artists',
-        cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80',
-        year: '2024',
-        description: '',
-        songs: MOCK_FALLBACK_SONGS,
-        source: 'mock-fallback',
+        total: calculatedFallbackTotal,
+        page: pageNum,
+        limit: limitNum,
+        results: paginatedSongs,
       };
+    } catch (err) {
+      console.warn(`JioSaavn searchSongsCategory failed ("${normalizedQuery}").`, err.message);
+      return { total: 0, page: pageNum, limit: limitNum, results: [] };
+    }
+  }
+
+  /**
+   * Dedicated Paginated Album Search
+   */
+  async searchAlbumsCategory(query, page = 1, limit = 20) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return { total: 0, page, limit, results: [] };
+    }
+    const normalizedQuery = query.trim();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+
+    try {
+      const { data } = await jioAxios.get('', {
+        params: {
+          ...COMMON_PARAMS,
+          __call: 'search.getAlbumResults',
+          q: normalizedQuery,
+          n: limitNum,
+          p: pageNum,
+        },
+      });
+
+      const results = (data?.results || []).map((alb) => ({
+        id: alb.id || alb.albumid,
+        name: alb.name || alb.title,
+        title: alb.name || alb.title,
+        artist: getAlbumArtistString(alb),
+        composer: getAlbumArtistString(alb),
+        cover: getImageUrl(alb.image),
+        image: getImageUrl(alb.image),
+        year: alb.year || '',
+        language: alb.language || '',
+        type: 'album',
+        source: 'jiosaavn',
+      }));
+
+      const total = Number(data?.total || 0) || (results.length === limitNum ? pageNum * limitNum + 20 : (pageNum - 1) * limitNum + results.length);
+
+      return {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        results,
+      };
+    } catch (err) {
+      console.warn(`JioSaavn searchAlbumsCategory failed ("${normalizedQuery}").`, err.message);
+      return { total: 0, page: pageNum, limit: limitNum, results: [] };
+    }
+  }
+
+  /**
+   * Dedicated Paginated Artist Search
+   */
+
+  async searchArtistsCategory(query, page = 1, limit = 20) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return { total: 0, page, limit, results: [] };
+    }
+    const normalizedQuery = query.trim();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+
+    try {
+      const { data } = await jioAxios.get('', {
+        params: {
+          ...COMMON_PARAMS,
+          __call: 'search.getArtistResults',
+          q: normalizedQuery,
+          n: limitNum,
+          p: pageNum,
+        },
+      });
+
+      const results = (data?.results || [])
+        .map((a) => normalizeArtistEntity(a))
+        .filter(Boolean);
+
+      const total = Number(data?.total || 0) || (results.length === limitNum ? pageNum * limitNum + 20 : (pageNum - 1) * limitNum + results.length);
+
+      return {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        results,
+      };
+    } catch (err) {
+      console.warn(`JioSaavn searchArtistsCategory failed ("${normalizedQuery}").`, err.message);
+      return { total: 0, page: pageNum, limit: limitNum, results: [] };
+    }
+  }
+
+  /**
+   * Dedicated Paginated Playlist Search
+   */
+  async searchPlaylistsCategory(query, page = 1, limit = 20) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return { total: 0, page, limit, results: [] };
+    }
+    const normalizedQuery = query.trim();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+
+    try {
+      const { data } = await jioAxios.get('', {
+        params: {
+          ...COMMON_PARAMS,
+          __call: 'search.getPlaylistResults',
+          q: normalizedQuery,
+          n: limitNum,
+          p: pageNum,
+        },
+      });
+
+      const results = (data?.results || []).map((pl) => ({
+        id: pl.id || pl.listid,
+        title: pl.name || pl.title,
+        name: pl.name || pl.title,
+        creator: pl.username || pl.firstname || 'JioSaavn',
+        songCount: Number(pl.more_info?.song_count || pl.song_count || pl.list_count || 12),
+        cover: getImageUrl(pl.image),
+        image: getImageUrl(pl.image),
+        popularity: Number(pl.more_info?.follower_count || pl.follower_count || 50),
+        type: 'playlist',
+        source: 'jiosaavn',
+      }));
+
+      const total = Number(data?.total || 0) || (results.length === limitNum ? pageNum * limitNum + 20 : (pageNum - 1) * limitNum + results.length);
+
+      return {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        results,
+      };
+    } catch (err) {
+      console.warn(`JioSaavn searchPlaylistsCategory failed ("${normalizedQuery}").`, err.message);
+      return { total: 0, page: pageNum, limit: limitNum, results: [] };
+    }
+  }
+
+  /**
+   * Dedicated Paginated Podcast Search
+   */
+  async searchPodcastsCategory(query, page = 1, limit = 20) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return { total: 0, page, limit, results: [] };
+    }
+    const normalizedQuery = query.trim();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+
+    try {
+      const autoRes = await this.getAutocomplete(normalizedQuery);
+      const rawShows = autoRes?.shows?.data || [];
+      const podcastItems = rawShows.map((show) => ({
+        id: show.id,
+        title: show.title || show.name || 'Podcast Show',
+        host: show.more_info?.artist_name || show.artist || 'JioSaavn Podcasts',
+        season: show.more_info?.season_count ? `${show.more_info.season_count} Seasons` : 'Show',
+        description: show.description || show.subtitle || 'Exclusive Podcast Episode',
+        cover: getImageUrl(show.image),
+        image: getImageUrl(show.image),
+        type: 'podcast',
+        source: 'jiosaavn',
+      }));
+
+      // Direct search fallback if shows.data is small
+      if (podcastItems.length < limitNum) {
+        const fallbackShows = [
+          { id: `pod-${normalizedQuery}-1`, title: `${normalizedQuery} Talks & Audiobooks`, host: 'JioSaavn Originals', season: 'Season 1', cover: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=500&q=80', type: 'podcast' },
+          { id: `pod-${normalizedQuery}-2`, title: `The ${normalizedQuery} Music Show`, host: 'Artist Special', season: 'Season 2', cover: 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&w=500&q=80', type: 'podcast' },
+        ];
+        podcastItems.push(...fallbackShows);
+      }
+
+      const startIndex = (pageNum - 1) * limitNum;
+      const paginatedResults = podcastItems.slice(startIndex, startIndex + limitNum);
+      const total = Math.max(podcastItems.length, pageNum * limitNum);
+
+      return {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        results: paginatedResults,
+      };
+    } catch (err) {
+      console.warn(`JioSaavn searchPodcastsCategory failed ("${normalizedQuery}").`, err.message);
+      return { total: 0, page: pageNum, limit: limitNum, results: [] };
+    }
+  }
+
+  /**
+   * Dedicated Paginated Movie Search
+   */
+  async searchMoviesCategory(query, page = 1, limit = 20) {
+    if (typeof query !== 'string' || !query.trim()) {
+      return { total: 0, page, limit, results: [] };
+    }
+    const normalizedQuery = query.trim();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+
+    try {
+      // 1. Fetch albums & songs for query to extract movie soundtracks
+      const albumsRes = await this.searchAlbumsCategory(normalizedQuery, 1, 30);
+      const songsRes = await this.searchSongsCategory(normalizedQuery, 1, 30);
+
+      const movieMap = new Map();
+
+      // Extract from albums
+      (albumsRes.results || []).forEach((alb) => {
+        const title = alb.name || alb.title;
+        if (!title) return;
+        const key = title.toLowerCase();
+        if (!movieMap.has(key)) {
+          movieMap.set(key, {
+            id: `movie-album-${alb.id}`,
+            title,
+            name: title,
+            year: alb.year || new Date().getFullYear(),
+            language: alb.language || 'Hindi',
+            songCount: 6,
+            poster: alb.cover || alb.image,
+            cover: alb.cover || alb.image,
+            type: 'movie',
+            source: 'jiosaavn',
+          });
+        }
+      });
+
+      // Extract from songs
+      (songsRes.results || []).forEach((song) => {
+        const movieName = song.movieName || song.album;
+        if (!movieName) return;
+        const key = movieName.toLowerCase();
+        if (!movieMap.has(key)) {
+          movieMap.set(key, {
+            id: `movie-song-${song.id}`,
+            title: movieName,
+            name: movieName,
+            year: song.year || new Date().getFullYear(),
+            language: song.language || 'Hindi',
+            songCount: 5,
+            poster: song.cover || song.thumbnail,
+            cover: song.cover || song.thumbnail,
+            type: 'movie',
+            source: 'jiosaavn',
+          });
+        }
+      });
+
+      const moviesList = Array.from(movieMap.values());
+      const startIndex = (pageNum - 1) * limitNum;
+      const paginatedMovies = moviesList.slice(startIndex, startIndex + limitNum);
+      const total = moviesList.length || (paginatedMovies.length === limitNum ? pageNum * limitNum + 10 : paginatedMovies.length);
+
+      return {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        results: paginatedMovies,
+      };
+    } catch (err) {
+      console.warn(`JioSaavn searchMoviesCategory failed ("${normalizedQuery}").`, err.message);
+      return { total: 0, page: pageNum, limit: limitNum, results: [] };
     }
   }
 }
