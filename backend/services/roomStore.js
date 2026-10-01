@@ -22,6 +22,9 @@ const serializeRoom = (room) => ({
   currentSong: room.currentSong,
   isPlaying: room.isPlaying,
   currentTime: room.currentTime,
+  isCouple: Boolean(room.isCouple),
+  maxMembers: room.maxMembers || null,
+  sharedPlaylist: room.sharedPlaylist || [],
   members: Array.from(room.members.entries()).map(([socketId, name]) => ({
     socketId,
     name,
@@ -58,7 +61,7 @@ const serializePlaybackSnapshot = (room) => ({
   serverTime: Date.now(),
 });
 
-const createRoom = (hostName = 'Host') => {
+const createRoom = (hostName = 'Host', options = {}) => {
   const roomId = generateRoomId();
   const now = Date.now();
 
@@ -72,10 +75,17 @@ const createRoom = (hostName = 'Host') => {
     createdAt: now,
     updatedAt: now,
     hostName: sanitizeName(hostName),
+    isCouple: Boolean(options.isCouple),
+    maxMembers: options.maxMembers || (options.isCouple ? 2 : null),
+    sharedPlaylist: [],
   };
 
   rooms.set(roomId, room);
   return serializeRoom(room);
+};
+
+const createCoupleRoom = (hostName = 'Partner 1') => {
+  return createRoom(hostName, { isCouple: true, maxMembers: 2 });
 };
 
 const getRoom = (roomId) => {
@@ -122,12 +132,42 @@ const updateRoomState = (roomId, statePatch = {}) => {
   return serializeRoom(room);
 };
 
+const updateCouplePlaylist = (roomId, action, track) => {
+  const normalizedRoomId = String(roomId || '').trim();
+  const room = rooms.get(normalizedRoomId);
+
+  if (!room) return null;
+
+  if (!room.sharedPlaylist) {
+    room.sharedPlaylist = [];
+  }
+
+  if (action === 'add' && track) {
+    const exists = room.sharedPlaylist.some(t => String(t.id) === String(track.id));
+    if (!exists) {
+      room.sharedPlaylist.push({ ...track, addedAt: Date.now() });
+    }
+  } else if (action === 'remove' && track) {
+    room.sharedPlaylist = room.sharedPlaylist.filter(t => String(t.id) !== String(track.id));
+  } else if (action === 'clear') {
+    room.sharedPlaylist = [];
+  }
+
+  room.updatedAt = Date.now();
+  return serializeRoom(room);
+};
+
 const joinSocketToRoom = (roomId, socketId, userName) => {
   const normalizedRoomId = String(roomId || '').trim();
   const room = rooms.get(normalizedRoomId);
 
   if (!room) {
     return null;
+  }
+
+  // Enforce Max Members Limit (e.g. 2 for Couple Mode)
+  if (room.maxMembers && !room.members.has(socketId) && room.members.size >= room.maxMembers) {
+    return { error: `Room is full (Maximum ${room.maxMembers} users in Couple Mode)` };
   }
 
   room.members.set(socketId, sanitizeName(userName));
@@ -177,10 +217,12 @@ const getJoinedRoomsBySocket = (socketId) => {
 
 module.exports = {
   createRoom,
+  createCoupleRoom,
   getRoom,
   getRoomSnapshot,
   getAllRoomIds,
   updateRoomState,
+  updateCouplePlaylist,
   joinSocketToRoom,
   leaveSocketFromRoom,
   getJoinedRoomsBySocket,
