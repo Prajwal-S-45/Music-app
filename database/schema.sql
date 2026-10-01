@@ -98,6 +98,29 @@ CREATE TABLE IF NOT EXISTS history_items (
   INDEX idx_history_type (type)
 );
 
+-- Recommendation System Tables
+
+-- Song Popularity Tracking
+CREATE TABLE IF NOT EXISTS song_popularity (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  song_id VARCHAR(64) NOT NULL UNIQUE,
+  play_count BIGINT NOT NULL DEFAULT 0,
+  last_played TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_song_popularity_count (play_count DESC)
+);
+
+-- User Play History
+CREATE TABLE IF NOT EXISTS user_play_history (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  song_id VARCHAR(64) NOT NULL,
+  event_type ENUM('play', 'like', 'skip', 'pause', 'complete') NOT NULL DEFAULT 'play',
+  occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_user_history_user (user_id, occurred_at),
+  INDEX idx_user_history_song (song_id)
+);
+
 -- Sample Songs (Optional)
 INSERT INTO songs (title, artist, album, duration) VALUES
 ('Song One', 'Artist A', 'Album 1', 180),
@@ -121,7 +144,7 @@ CREATE TABLE IF NOT EXISTS artists (
 
 CREATE TABLE IF NOT EXISTS artist_images (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  artist_id VARCHAR(255) NOT NULL,
+  artist_id VARCHAR(255) NOT NULL UNIQUE,
   thumbnail TEXT,
   banner TEXT,
   fanart TEXT,
@@ -133,7 +156,7 @@ CREATE TABLE IF NOT EXISTS artist_images (
 
 CREATE TABLE IF NOT EXISTS artist_biographies (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  artist_id VARCHAR(255) NOT NULL,
+  artist_id VARCHAR(255) NOT NULL UNIQUE,
   biography TEXT,
   listeners INT DEFAULT 0,
   playcount INT DEFAULT 0,
