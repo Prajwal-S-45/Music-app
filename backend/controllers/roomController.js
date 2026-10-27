@@ -14,6 +14,20 @@ exports.createRoom = (req, res) => {
   }
 };
 
+exports.createCoupleRoom = (req, res) => {
+  try {
+    const { userName } = req.body || {};
+    const room = roomStore.createCoupleRoom(userName || 'Partner 1');
+
+    res.status(201).json({
+      message: 'Couple room created',
+      room,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 exports.joinRoom = (req, res) => {
   try {
     const { roomId } = req.body || {};
